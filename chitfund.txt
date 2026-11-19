@@ -1,0 +1,17 @@
+you will make a full detail text using following sentance
+  I want to make a chit fund application 
+
+features:
+
+no of month, no of members, maximum no of members, choose the how many years of chit with detail of stating date and month and year same as end of the chit year date.
+chit every month starting date
+grace days
+grace peried
+then i want a table to chit schedules with how much amount will pay remaining amount to company 
+
+and then collection date: with input field
+chit date:  with input field
+chit person: with input field
+amount: with input field
+
+ 

@@ -1,0 +1,1695 @@
+CHITPRO - CHIT FUND MANAGEMENT SYSTEM
+SOFTWARE REQUIREMENTS SPECIFICATION (SRS)
+Version: 1.0
+Date: 17 November 2026
+
+============================================================
+1. PROJECT OVERVIEW
+============================================================
+
+Project Name:
+    ChitPro - Chit Fund Management System
+
+Project Type:
+    Single-company, single-branch chit fund management application.
+
+Primary User:
+    Administrator.
+
+Technology Stack:
+    Backend: ASP.NET Core Web API
+    Backend Language: C#
+    Target Framework Requested: .NET 8
+    Frontend: Next.js with TypeScript
+    UI Styling: Tailwind CSS
+    Database: Microsoft SQL Server
+    ORM: Entity Framework Core
+    API Style: REST API
+    Development Environment: Visual Studio Code on Windows
+    Version Control: Git and GitHub
+    No type script
+
+Architecture:
+    Monolithic application with layered backend architecture.
+
+Project Objective:
+    Build a secure application to manage the operational and financial
+    activities of a chit fund company. The application will manage
+    customers, chit groups, memberships, installments, collections,
+    auctions, dividends, expenses, reports and audit history.
+
+IMPORTANT FRAMEWORK SUPPORT NOTE:
+    .NET 8 support ended on 10 November 2026. It may be used for a
+    learning or compatibility project, but it should not be used for a
+    new production deployment without an upgrade plan. Upgrade to a
+    supported .NET LTS release, such as .NET 10, before production use.
+    Keep related Entity Framework Core packages on the matching major
+    version.
+
+============================================================
+2. PROJECT GOALS
+============================================================
+
+1. Maintain customer information in one database.
+2. Create and manage multiple chit groups.
+3. Register customers as members of chit groups.
+4. Generate monthly installment schedules.
+5. Record and reconcile customer payments.
+6. Generate unique payment receipts.
+7. Schedule and record monthly auctions.
+8. Record bids and approved auction results.
+9. Calculate dividends using approved company rules.
+10. Manage prize payout approvals and disbursements.
+11. Track pending and overdue installments.
+12. Record company expenses.
+13. Generate operational and financial reports.
+14. Maintain audit history for important actions.
+15. Protect customer and financial information.
+
+============================================================
+3. SCOPE
+============================================================
+
+IN SCOPE:
+    - One company.
+    - One branch.
+    - Admin web portal.
+    - Customer registration and management.
+    - Chit group and membership management.
+    - Installment schedule generation.
+    - Payment collection and receipts.
+    - Auction and bid management.
+    - Dividend allocation.
+    - Prize payout management.
+    - Expense tracking.
+    - Reports and exports.
+    - Admin authentication and authorization.
+    - Audit logs and company settings.
+
+NOT INCLUDED IN THE FIRST RELEASE:
+    - Multiple-company SaaS functionality.
+    - Multiple branches.
+    - Separate customer login portal.
+    - Separate employee or collection-agent portal.
+    - Native Android or iOS applications.
+    - Automatic bank transfers.
+    - Automatic UPI payment settlement.
+    - Automatic SMS or WhatsApp sending unless a provider is
+      separately selected and integrated.
+
+============================================================
+4. USER ROLES
+============================================================
+
+Initial role:
+    ADMIN
+
+Admin permissions:
+    - Log in and log out.
+    - View dashboard.
+    - Create, view, update and deactivate customers.
+    - Manage customer documents.
+    - Create and manage chit groups.
+    - Enroll customers into groups.
+    - Generate installment schedules.
+    - Record and review payments.
+    - Print payment receipts.
+    - Schedule auctions.
+    - Record bids.
+    - Submit and approve auction results.
+    - Review dividend calculations.
+    - Approve and record prize payouts.
+    - Record company expenses.
+    - View and export reports.
+    - Manage company settings.
+    - View audit logs.
+
+Future roles may include accountant, branch manager, auction manager
+and collection agent. The initial application will not expose those
+separate portals.
+
+============================================================
+5. FUNCTIONAL REQUIREMENTS
+============================================================
+
+FR-01 AUTHENTICATION
+    - Admin must log in using approved credentials.
+    - Passwords must be securely hashed.
+    - Unauthenticated users must not access protected APIs.
+    - Admin must be able to log out.
+    - Admin must be able to change a password.
+    - Failed login attempts should be rate-limited and logged.
+    - Authentication should use secure cookies or another carefully
+      designed token strategy.
+
+FR-02 DASHBOARD
+    Display:
+    - Total registered customers.
+    - Active chit groups.
+    - Total chit value under management.
+    - Today's collection.
+    - Monthly collection.
+    - Outstanding installments.
+    - Upcoming auctions.
+    - Recent payments.
+    - Recent payouts.
+    - Monthly collection chart.
+    Dashboard values must be calculated from database records and
+    must not be hard-coded.
+
+FR-03 CUSTOMER MANAGEMENT
+    Customer fields:
+    - Customer ID.
+    - Customer code.
+    - Full name.
+    - Mobile number.
+    - Email address (optional).
+    - Date of birth (optional, if required).
+    - Address.
+    - Registration date.
+    - Customer status.
+    - Nominee details (if required).
+    - KYC verification status.
+
+    Features:
+    - Register a customer.
+    - View customer details.
+    - Update customer details.
+    - Search by customer code, name or mobile number.
+    - View membership history.
+    - View payment history.
+    - Deactivate a customer without deleting financial history.
+    - Upload and manage permitted KYC documents.
+
+    Sensitive identity data such as Aadhaar and PAN must only be
+    collected when legally necessary. Apply encryption, restricted
+    access, retention controls and applicable privacy requirements.
+
+FR-04 CHIT GROUP MANAGEMENT
+    Chit group fields:
+    - Group ID.
+    - Group code.
+    - Group name.
+    - Total chit value.
+    - Total number of members.
+    - Duration in months.
+    - Monthly subscription amount.
+    - Start date.
+    - End date.
+    - Auction frequency.
+    - Applicable agreement and financial-rule references.
+    - Group status.
+
+    Features:
+    - Create a draft group.
+    - Configure group details.
+    - Validate group configuration.
+    - Activate a group only after required approvals and legal
+      prerequisites are satisfied.
+    - View group details.
+    - View group members.
+    - View group installment schedule.
+    - View auction history.
+    - Close a group according to approved procedures.
+
+FR-05 CHIT MEMBERSHIP
+    - A customer may join more than one chit group, subject to
+      company rules and legal requirements.
+    - A chit group may contain multiple members.
+    - Each membership must have a unique member code within the
+      required scope.
+    - Store joining date and membership status.
+    - Record membership approval and relevant documents.
+    - Do not delete membership history when a customer is deactivated.
+
+FR-06 INSTALLMENT SCHEDULE
+    - Generate installments according to group configuration.
+    - Each installment must identify its chit membership.
+    - Store installment number, due date, due amount and status.
+    - Prevent duplicate installment generation.
+    - Track paid, partially paid, overdue and cancelled states.
+    - Schedule changes must be controlled and audited.
+
+FR-07 PAYMENT COLLECTION
+    - Select customer and chit membership.
+    - Select the relevant installment.
+    - Enter amount received.
+    - Select payment mode: cash, UPI, bank transfer or cheque.
+    - Record transaction reference where applicable.
+    - Record payment date and recording admin.
+    - Generate a unique receipt number.
+    - Support partial payments if permitted by company rules.
+    - Prevent duplicate submissions using idempotency controls.
+    - Provide payment history and receipt printing.
+    - Corrections must use a reversal or adjustment workflow.
+
+FR-08 AUCTION MANAGEMENT
+    - Create an auction for an eligible chit group and installment
+      period.
+    - Record auction date and auction number.
+    - Record eligible members.
+    - Record bids and bidder membership.
+    - Validate bids against the registered agreement and applicable law.
+    - Submit auction result for approval.
+    - Record winner and discount amount.
+    - Prevent more than one approved result for the same auction.
+    - Preserve the full auction history.
+
+FR-09 DIVIDEND MANAGEMENT
+    - Calculate distributable amount using approved rules.
+    - Determine eligible members using approved eligibility rules.
+    - Calculate member-wise dividend.
+    - Store calculation inputs and outputs.
+    - Allow review before posting.
+    - Preserve historical calculations.
+    - Support controlled correction entries.
+    The system must not assume one universal dividend formula.
+    The formula must be reviewed against the registered chit
+    agreement and applicable legal requirements.
+
+FR-10 PRIZE PAYOUT MANAGEMENT
+    - Create payout record linked to an approved auction result.
+    - Record gross amount.
+    - Record permitted deductions and their reasons.
+    - Calculate net payable amount.
+    - Track document verification.
+    - Track approval status.
+    - Record disbursement date and transaction reference.
+    - Do not automatically transfer money merely because an auction
+      result has been approved.
+    - Preserve payout and reversal history.
+
+FR-11 OVERDUE MANAGEMENT
+    - Identify installments past their due date.
+    - Show outstanding amount.
+    - Show customer and membership details.
+    - Show payment and follow-up history.
+    - Apply penalties only where authorized by agreement and law.
+    - Generate overdue reports.
+
+FR-12 EXPENSE MANAGEMENT
+    - Record expense category.
+    - Record amount and date.
+    - Record description and supporting document.
+    - Record created-by user.
+    - Support review or approval where configured.
+    - Preserve corrections through audit history.
+
+FR-13 REPORTS
+    Required reports:
+    - Daily collection.
+    - Monthly collection.
+    - Customer ledger.
+    - Customer membership history.
+    - Group-wise collection.
+    - Installment due report.
+    - Outstanding report.
+    - Payment mode report.
+    - Auction history.
+    - Dividend statement.
+    - Prize payout statement.
+    - Expense report.
+    - Financial reconciliation report.
+
+    Export formats:
+    - PDF.
+    - Excel.
+    - CSV where useful.
+
+FR-14 NOTIFICATIONS
+    - Store notification events.
+    - Support payment reminders and auction reminders.
+    - External SMS, email or WhatsApp sending requires a selected
+      provider, configuration and consent where applicable.
+    - Record delivery status if an external provider is integrated.
+
+FR-15 AUDIT LOGS
+    Record important actions:
+    - Login and failed login.
+    - Customer creation and updates.
+    - Group creation and configuration changes.
+    - Membership changes.
+    - Payment creation and reversal.
+    - Auction result submission and approval.
+    - Dividend posting.
+    - Payout approval and disbursement.
+    - Expense creation and updates.
+    - Company setting changes.
+
+   
+
+FR-16 COMPANY SETTINGS
+    - Company name and address.
+    - Contact information.
+    - Receipt numbering configuration.
+    - Financial year settings.
+    - Currency settings.
+    - Approved chit calculation settings.
+    - Document and report preferences.
+
+============================================================
+6. NON-FUNCTIONAL REQUIREMENTS
+============================================================
+
+SECURITY:
+    - Use HTTPS.
+    - Hash passwords with a modern password hashing mechanism.
+    - Apply authorization to all protected endpoints.
+    - Validate all user input.
+    - Use EF Core parameterized database operations.
+    - Protect secrets outside source control.
+    - Rate-limit authentication endpoints.
+    - Validate uploaded file type, size and content.
+    - Restrict access to sensitive customer information.
+    - Maintain audit records.
+
+PERFORMANCE:
+    - Paginate large customer and payment lists.
+    - Add indexes to frequently searched fields.
+    - Avoid loading unnecessary related data.
+    - Use database queries and projections efficiently.
+    - Establish performance targets through testing.
+
+RELIABILITY:
+    - Financial operations must be transactional.
+    - Prevent duplicate payment processing.
+    - Use database constraints.
+    - Back up the database.
+    - Test restoration from backup.
+
+MAINTAINABILITY:
+    - Use layered architecture.
+    - Keep controllers thin.
+    - Separate DTOs from database entities.
+    - Keep financial calculations in tested services/domain logic.
+    - Use migrations for schema changes.
+    - Write unit and integration tests.
+
+USABILITY:
+    - Responsive admin interface.
+    - Clear validation messages.
+    - Search, sorting and pagination.
+    - Confirmation for sensitive actions.
+    - Printable receipts and reports.
+
+============================================================
+7. SYSTEM ARCHITECTURE
+============================================================
+
+Architecture:
+    Monolithic application with layered backend.
+
+TEXT ARCHITECTURE DIAGRAM:
+
+    +----------------------------------------------+
+    |              ADMIN WEB PORTAL                |
+    |       Next.js + js only + Tailwind        |
+    |                                              |
+    | Dashboard | Customers | Groups | Payments    |
+    | Auctions  | Dividends  | Payouts | Reports    |
+    +----------------------+-----------------------+
+                           |
+                           | HTTPS / JSON REST API
+                           v
+    +----------------------------------------------+
+    |             ASP.NET CORE WEB API             |
+    |                                              |
+    | Authentication | Authorization | Controllers|
+    | Request Validation | Error Handling          |
+    +----------------------+-----------------------+
+                           |
+                           v
+    +----------------------------------------------+
+    |            APPLICATION LAYER                 |
+    |                                              |
+    | Customer Services | Group Services           |
+    | Payment Services  | Auction Services         |
+    | Dividend Services | Payout Services           |
+    | Report Services   | Interfaces                |
+    +----------------------+-----------------------+
+                           |
+                           v
+    +----------------------------------------------+
+    |               DOMAIN LAYER                   |
+    |                                              |
+    | Entities | Enums | Business Rules            |
+    | Financial Rules | Domain Validation          |
+    +----------------------+-----------------------+
+                           |
+                           v
+    +----------------------------------------------+
+    |            INFRASTRUCTURE LAYER              |
+    |                                              |
+    | Entity Framework Core | DbContext            |
+    | Repositories | SQL Server | File Storage     |
+    +----------------------+-----------------------+
+                           |
+                           v
+    +----------------------------------------------+
+    |              SQL SERVER                      |
+    |                 ChitProDB                    |
+    +----------------------------------------------+
+
+REQUEST FLOW:
+    1. Admin uses a Next.js page.
+    2. Frontend sends an HTTPS request.
+    3. ASP.NET API authenticates and authorizes the request.
+    4. Controller validates the request contract.
+    5. Application service executes the use case.
+    6. Domain rules validate business conditions.
+    7. Infrastructure uses EF Core to access SQL Server.
+    8. API returns a structured response.
+    9. Frontend displays the result.
+
+============================================================
+8. BACKEND FOLDER STRUCTURE
+============================================================
+
+ChitPro/
+|
++-- backend/
+|   |
+|   +-- ChitPro.sln
+|   |
+|   +-- ChitPro.API/
+|   |   +-- Controllers/
+|   |   +-- Middleware/
+|   |   +-- Extensions/
+|   |   +-- Configuration/
+|   |   +-- Properties/
+|   |   +-- Program.cs
+|   |   +-- appsettings.json
+|   |   +-- appsettings.Development.json
+|   |
+|   +-- ChitPro.Application/
+|   |   +-- DTOs/
+|   |   +-- Interfaces/
+|   |   +-- Services/
+|   |   +-- Validators/
+|   |   +-- Features/
+|   |
+|   +-- ChitPro.Domain/
+|   |   +-- Entities/
+|   |   +-- Enums/
+|   |   +-- Common/
+|   |   +-- Rules/
+|   |
+|   +-- ChitPro.Infrastructure/
+|   |   +-- Data/
+|   |   +-- Configurations/
+|   |   +-- Repositories/
+|   |   +-- Migrations/
+|   |   +-- Services/
+|   |
+|   +-- ChitPro.Tests/
+|       +-- UnitTests/
+|       +-- IntegrationTests/
+|
++-- frontend/
+    +-- src/
+        +-- app/
+        +-- components/
+        +-- features/
+        +-- hooks/
+        +-- lib/
+        +-- types/
+        +-- styles/
+
+PROJECT RESPONSIBILITIES:
+
+ChitPro.API:
+    HTTP endpoints, authentication setup, middleware and dependency
+    injection configuration.
+
+ChitPro.Application:
+    Use cases, DTOs, validation, service interfaces and application
+    workflows.
+
+ChitPro.Domain:
+    Core entities, enumerations and business rules. It should not
+    depend on the database or web framework.
+
+ChitPro.Infrastructure:
+    EF Core DbContext, SQL Server access, migrations, repository
+    implementations and external integrations.
+
+ChitPro.Tests:
+    Unit tests and integration tests.
+
+============================================================
+9. DATABASE DESIGN
+============================================================
+
+Database Name:
+    ChitProDB
+
+Money Data Type:
+    DECIMAL(18,2)
+
+Date and Time:
+    Use appropriate SQL date/time types and store timestamps
+    consistently. Define the business timezone for display and
+    date-based operations.
+
+IMPORTANT DATABASE RULES:
+    - Do not use float or double for money.
+    - Use decimal in C# and DECIMAL(18,2) in SQL Server.
+    - Add primary and foreign keys.
+    - Add unique constraints for customer codes and receipt numbers.
+    - Add indexes for commonly searched columns.
+    - Preserve financial history.
+    - Use transactions for multi-record financial operations.
+    - Use soft deactivation for customers where appropriate.
+    - Correct financial records through reversal/adjustment records.
+
+9.1 USERS TABLE
+
+    Id                  INT, Primary Key
+    Username            NVARCHAR(100), Unique
+    PasswordHash        NVARCHAR(500)
+    Email               NVARCHAR(255), Nullable
+    IsActive            BIT
+    CreatedAt           DATETIME2
+    UpdatedAt           DATETIME2, Nullable
+
+    Purpose:
+        Stores admin login accounts. Use ASP.NET Core Identity
+        where possible instead of implementing password storage
+        and authentication from scratch.
+
+9.2 CUSTOMERS TABLE
+
+    Id                  INT, Primary Key
+    CustomerCode        NVARCHAR(30), Unique
+    FullName            NVARCHAR(200)
+    Mobile              NVARCHAR(20)
+    Email               NVARCHAR(255), Nullable
+    DateOfBirth         DATE, Nullable
+    Address             NVARCHAR(1000), Nullable
+    RegistrationDate    DATE
+    Status              NVARCHAR(30)
+    CreatedAt           DATETIME2
+    UpdatedAt           DATETIME2, Nullable
+
+9.3 CUSTOMER_DOCUMENTS TABLE
+
+    Id                  INT, Primary Key
+    CustomerId          INT, Foreign Key
+    DocumentType        NVARCHAR(50)
+    FileReference       NVARCHAR(500)
+    VerificationStatus  NVARCHAR(30)
+    UploadedAt          DATETIME2
+    VerifiedAt          DATETIME2, Nullable
+
+    Do not store unrestricted public file URLs for private KYC
+    documents. Use controlled storage and authorization.
+
+9.4 CHIT_GROUPS TABLE
+
+    Id                  INT, Primary Key
+    GroupCode           NVARCHAR(30), Unique
+    GroupName           NVARCHAR(150)
+    ChitValue           DECIMAL(18,2)
+    TotalMembers        INT
+    DurationMonths      INT
+    MonthlySubscription DECIMAL(18,2)
+    StartDate           DATE
+    EndDate             DATE, Nullable
+    Status              NVARCHAR(30)
+    AgreementReference  NVARCHAR(500), Nullable
+    CreatedAt           DATETIME2
+    UpdatedAt           DATETIME2, Nullable
+
+9.5 CHIT_MEMBERS TABLE
+
+    Id                  INT, Primary Key
+    CustomerId          INT, Foreign Key
+    ChitGroupId         INT, Foreign Key
+    MemberCode          NVARCHAR(30)
+    JoiningDate         DATE
+    Status              NVARCHAR(30)
+    CreatedAt           DATETIME2
+
+    Add a unique constraint appropriate to the group/member code
+    and prevent duplicate active membership where company rules
+    require it.
+
+9.6 INSTALLMENTS TABLE
+
+    Id                  INT, Primary Key
+    ChitMemberId        INT, Foreign Key
+    InstallmentNumber   INT
+    DueDate             DATE
+    DueAmount           DECIMAL(18,2)
+    Status              NVARCHAR(30)
+    CreatedAt           DATETIME2
+
+    Add a unique constraint on ChitMemberId and InstallmentNumber.
+
+9.7 PAYMENT_MODES TABLE
+
+    Id                  INT, Primary Key
+    Name                NVARCHAR(50)
+    IsActive            BIT
+
+    Examples:
+        Cash
+        UPI
+        Bank Transfer
+        Cheque
+
+9.8 PAYMENTS TABLE
+
+    Id                  BIGINT, Primary Key
+    InstallmentId       INT, Foreign Key
+    PaymentModeId       INT, Foreign Key
+    RecordedByUserId    INT, Foreign Key
+    ReceiptNumber       NVARCHAR(50), Unique
+    Amount              DECIMAL(18,2)
+    PaymentDate         DATETIME2
+    TransactionReference NVARCHAR(150), Nullable
+    Status              NVARCHAR(30)
+    IdempotencyKey      NVARCHAR(100), Nullable
+    CreatedAt           DATETIME2
+
+    For partial payments, one installment may have multiple payment
+    records. Track reversals separately and calculate the balance
+    from valid transactions.
+
+9.9 AUCTIONS TABLE
+
+    Id                  INT, Primary Key
+    ChitGroupId         INT, Foreign Key
+    AuctionNumber       INT
+    AuctionDate         DATETIME2
+    Status              NVARCHAR(30)
+    CreatedByUserId     INT, Foreign Key
+    CreatedAt           DATETIME2
+
+    Add a unique constraint on ChitGroupId and AuctionNumber.
+
+9.10 AUCTION_BIDS TABLE
+
+    Id                  INT, Primary Key
+    AuctionId           INT, Foreign Key
+    ChitMemberId        INT, Foreign Key
+    BidAmount           DECIMAL(18,2)
+    BidTime             DATETIME2
+    Status              NVARCHAR(30)
+
+9.11 AUCTION_RESULTS TABLE
+
+    Id                  INT, Primary Key
+    AuctionId           INT, Foreign Key, Unique
+    WinnerMemberId      INT, Foreign Key
+    DiscountAmount      DECIMAL(18,2)
+    GrossPrizeAmount    DECIMAL(18,2)
+    ApprovedByUserId    INT, Foreign Key, Nullable
+    ApprovedAt          DATETIME2, Nullable
+    Status              NVARCHAR(30)
+
+9.12 DIVIDEND_ALLOCATIONS TABLE
+
+    Id                  INT, Primary Key
+    AuctionResultId     INT, Foreign Key
+    ChitMemberId        INT, Foreign Key
+    DividendAmount      DECIMAL(18,2)
+    CalculationVersion  NVARCHAR(30)
+    CreatedAt           DATETIME2
+
+    Add a suitable unique constraint to prevent duplicate allocations
+    for the same result and member.
+
+9.13 PRIZE_PAYOUTS TABLE
+
+    Id                  BIGINT, Primary Key
+    AuctionResultId     INT, Foreign Key, Unique
+    GrossAmount         DECIMAL(18,2)
+    Deductions          DECIMAL(18,2)
+    NetAmount           DECIMAL(18,2)
+    Status              NVARCHAR(30)
+    VerifiedByUserId    INT, Foreign Key, Nullable
+    ApprovedByUserId    INT, Foreign Key, Nullable
+    PaidAt              DATETIME2, Nullable
+    TransactionReference NVARCHAR(150), Nullable
+
+9.14 EXPENSES TABLE
+
+    Id                  INT, Primary Key
+    Category            NVARCHAR(100)
+    Description         NVARCHAR(500)
+    Amount              DECIMAL(18,2)
+    ExpenseDate         DATE
+    RecordedByUserId    INT, Foreign Key
+    Status              NVARCHAR(30)
+    CreatedAt           DATETIME2
+
+9.15 NOTIFICATIONS TABLE
+
+    Id                  BIGINT, Primary Key
+    CustomerId          INT, Foreign Key, Nullable
+    NotificationType    NVARCHAR(50)
+    Message             NVARCHAR(1000)
+    Channel             NVARCHAR(30)
+    DeliveryStatus      NVARCHAR(30)
+    CreatedAt           DATETIME2
+    SentAt              DATETIME2, Nullable
+
+9.16 AUDIT_LOGS TABLE
+
+    Id                  BIGINT, Primary Key
+    UserId              INT, Foreign Key, Nullable
+    Action              NVARCHAR(100)
+    EntityType          NVARCHAR(100)
+    EntityId            NVARCHAR(100)
+    Reason              NVARCHAR(500), Nullable
+    BeforeData          NVARCHAR(MAX), Nullable
+    AfterData           NVARCHAR(MAX), Nullable
+    CreatedAt           DATETIME2
+
+9.17 COMPANY_SETTINGS TABLE
+
+    Id                  INT, Primary Key
+    CompanyName         NVARCHAR(200)
+    Address             NVARCHAR(1000), Nullable
+    Phone               NVARCHAR(30), Nullable
+    Email               NVARCHAR(255), Nullable
+    CurrencyCode        NVARCHAR(10)
+    FinancialYearStart  DATE, Nullable
+    UpdatedAt           DATETIME2
+
+============================================================
+10. DATABASE RELATIONSHIPS
+============================================================
+
+CUSTOMERS:
+    One customer can have many customer documents.
+    One customer can have many chit memberships.
+
+CHIT GROUPS:
+    One chit group can have many chit memberships.
+    One chit group can have many auctions.
+
+CHIT MEMBERS:
+    One membership belongs to one customer.
+    One membership belongs to one chit group.
+    One membership can have many installments.
+    One membership can place many bids.
+    One membership can receive dividend allocations.
+
+INSTALLMENTS:
+    One installment belongs to one chit membership.
+    One installment can have multiple payment transactions.
+
+PAYMENTS:
+    Each payment belongs to one installment.
+    Each payment uses one payment mode.
+    Each payment is recorded by an admin user.
+
+AUCTIONS:
+    One auction belongs to one chit group.
+    One auction can have many bids.
+    One auction can have at most one approved result.
+
+AUCTION RESULTS:
+    One result belongs to one auction.
+    One result identifies a winning member.
+    One result can have multiple dividend allocations.
+    One result can have one prize payout.
+
+USERS:
+    One admin user can create many audit records.
+    One admin user can record many payments and auctions.
+
+============================================================
+11. TEXT-BASED ER DIAGRAM
+============================================================
+
+    +------------------+
+    |     CUSTOMERS    |
+    |------------------|
+    | PK Id            |
+    | UQ CustomerCode  |
+    | FullName         |
+    | Mobile           |
+    +--------+---------+
+             |
+             | 1 to many
+             v
+    +------------------+
+    |   CHIT_MEMBERS   |
+    |------------------|
+    | PK Id            |
+    | FK CustomerId    |
+    | FK ChitGroupId   |
+    | MemberCode       |
+    +--------+---------+
+             |
+             | many to 1
+             v
+    +------------------+
+    |    CHIT_GROUPS   |
+    |------------------|
+    | PK Id            |
+    | UQ GroupCode     |
+    | ChitValue        |
+    | TotalMembers     |
+    | DurationMonths   |
+    +--------+---------+
+             |
+             +----------------------+
+             |                      |
+             v                      v
+    +------------------+   +------------------+
+    |   INSTALLMENTS   |   |     AUCTIONS     |
+    |------------------|   |------------------|
+    | PK Id            |   | PK Id            |
+    | FK ChitMemberId  |   | FK ChitGroupId   |
+    | InstallmentNo    |   | AuctionNumber    |
+    | DueAmount        |   | AuctionDate      |
+    | DueDate          |   | Status           |
+    +--------+---------+   +--------+---------+
+             |                      |
+             | 1 to many            | 1 to many
+             v                      v
+    +------------------+   +------------------+
+    |     PAYMENTS     |   |   AUCTION_BIDS   |
+    |------------------|   |------------------|
+    | PK Id            |   | PK Id            |
+    | FK InstallmentId |   | FK AuctionId     |
+    | FK PaymentModeId |   | FK ChitMemberId  |
+    | ReceiptNumber    |   | BidAmount        |
+    | Amount           |   +------------------+
+    | PaymentDate      |
+    +------------------+            |
+                                    v
+                           +-------------------+
+                           |  AUCTION_RESULTS |
+                           |-------------------|
+                           | PK Id             |
+                           | FK AuctionId      |
+                           | FK WinnerMemberId |
+                           | DiscountAmount    |
+                           | GrossPrizeAmount  |
+                           +---------+---------+
+                                     |
+                       +-------------+-------------+
+                       |                           |
+                       v                           v
+             +-------------------+      +-------------------+
+             | DIVIDEND_ALLOCATIONS|    |   PRIZE_PAYOUTS   |
+             |-------------------|      |-------------------|
+             | PK Id             |      | PK Id             |
+             | FK AuctionResultId|      | FK AuctionResultId|
+             | FK ChitMemberId   |      | GrossAmount       |
+             | DividendAmount    |      | Deductions        |
+             +-------------------+      | NetAmount         |
+                                        | Status            |
+                                        +-------------------+
+
+Additional tables:
+    USERS
+    CUSTOMER_DOCUMENTS
+    PAYMENT_MODES
+    EXPENSES
+    NOTIFICATIONS
+    AUDIT_LOGS
+    COMPANY_SETTINGS
+
+============================================================
+12. API DESIGN
+============================================================
+
+Local API base URL:
+    Determined by the ASP.NET development launch profile.
+
+Versioned API route prefix:
+    /api/v1
+
+AUTHENTICATION:
+    POST   /api/v1/auth/login
+    POST   /api/v1/auth/logout
+    POST   /api/v1/auth/change-password
+    GET    /api/v1/auth/me
+
+DASHBOARD:
+    GET    /api/v1/dashboard/summary
+    GET    /api/v1/dashboard/collections
+    GET    /api/v1/dashboard/upcoming-auctions
+    GET    /api/v1/dashboard/recent-payments
+
+CUSTOMERS:
+    GET    /api/v1/customers
+    GET    /api/v1/customers/{id}
+    POST   /api/v1/customers
+    PUT    /api/v1/customers/{id}
+    DELETE /api/v1/customers/{id}
+    GET    /api/v1/customers/{id}/memberships
+    GET    /api/v1/customers/{id}/payments
+    POST   /api/v1/customers/{id}/documents
+
+CHIT GROUPS:
+    GET    /api/v1/chit-groups
+    GET    /api/v1/chit-groups/{id}
+    POST   /api/v1/chit-groups
+    PUT    /api/v1/chit-groups/{id}
+    POST   /api/v1/chit-groups/{id}/activate
+    POST   /api/v1/chit-groups/{id}/close
+    GET    /api/v1/chit-groups/{id}/members
+    GET    /api/v1/chit-groups/{id}/auctions
+
+MEMBERS:
+    POST   /api/v1/chit-groups/{id}/members
+    GET    /api/v1/members/{id}
+    PUT    /api/v1/members/{id}
+    POST   /api/v1/members/{id}/deactivate
+
+INSTALLMENTS:
+    GET    /api/v1/installments
+    GET    /api/v1/installments/{id}
+    POST   /api/v1/installments/generate
+    GET    /api/v1/members/{id}/installments
+    GET    /api/v1/installments/overdue
+
+PAYMENTS:
+    GET    /api/v1/payments
+    GET    /api/v1/payments/{id}
+    POST   /api/v1/payments
+    POST   /api/v1/payments/{id}/reverse
+    GET    /api/v1/payments/receipts/{id}
+
+AUCTIONS:
+    GET    /api/v1/auctions
+    GET    /api/v1/auctions/{id}
+    POST   /api/v1/auctions
+    POST   /api/v1/auctions/{id}/bids
+    POST   /api/v1/auctions/{id}/submit-result
+    POST   /api/v1/auctions/{id}/approve-result
+
+DIVIDENDS:
+    GET    /api/v1/dividends/{auctionResultId}
+    POST   /api/v1/dividends/{auctionResultId}/calculate
+    POST   /api/v1/dividends/{auctionResultId}/approve
+
+PAYOUTS:
+    GET    /api/v1/payouts
+    GET    /api/v1/payouts/{id}
+    POST   /api/v1/payouts
+    POST   /api/v1/payouts/{id}/verify
+    POST   /api/v1/payouts/{id}/approve
+    POST   /api/v1/payouts/{id}/mark-paid
+
+EXPENSES:
+    GET    /api/v1/expenses
+    POST   /api/v1/expenses
+    GET    /api/v1/expenses/{id}
+    PUT    /api/v1/expenses/{id}
+
+REPORTS:
+    GET    /api/v1/reports/collections
+    GET    /api/v1/reports/outstanding
+    GET    /api/v1/reports/customer-ledger
+    GET    /api/v1/reports/group-collections
+    GET    /api/v1/reports/auctions
+    GET    /api/v1/reports/dividends
+    GET    /api/v1/reports/payouts
+    GET    /api/v1/reports/expenses
+    GET    /api/v1/reports/reconciliation
+
+SETTINGS:
+    GET    /api/v1/settings/company
+    PUT    /api/v1/settings/company
+
+AUDIT:
+    GET    /api/v1/audit-logs
+
+API CONVENTIONS:
+    - Use GET for reading.
+    - Use POST for creating or executing controlled operations.
+    - Use PUT or PATCH for permitted updates.
+    - Use DELETE only for non-financial records where deletion is safe.
+    - Financial history must be corrected through reversal or adjustment.
+    - Use pagination for list endpoints.
+    - Validate request DTOs.
+    - Return suitable HTTP status codes.
+    - Do not expose database entities directly as API responses.
+
+EXAMPLE CUSTOMER REQUEST:
+
+    POST /api/v1/customers
+
+    {
+      "fullName": "Arun Kumar",
+      "mobile": "9876543210",
+      "email": "arun@example.com",
+      "address": "Salem, Tamil Nadu"
+    }
+
+EXAMPLE RESPONSE:
+
+    {
+      "success": true,
+      "message": "Customer created successfully",
+      "data": {
+        "id": 1,
+        "customerCode": "CUS-0001",
+        "fullName": "Arun Kumar",
+        "mobile": "9876543210"
+      },
+      "errors": []
+    }
+
+STANDARD HTTP STATUS CODES:
+    200 - Successful request.
+    201 - Resource created.
+    204 - Successful request with no response body.
+    400 - Invalid request.
+    401 - Authentication required.
+    403 - Access forbidden.
+    404 - Resource not found.
+    409 - Duplicate or conflicting operation.
+    422 - Business validation failure, if adopted consistently.
+    500 - Unexpected server error.
+
+============================================================
+13. FRONTEND PAGE DESIGN
+============================================================
+
+Admin routes:
+
+    /login
+    /dashboard
+    /customers
+    /customers/create
+    /customers/[id]
+    /chit-groups
+    /chit-groups/create
+    /chit-groups/[id]
+    /members
+    /installments
+    /payments
+    /payments/collect
+    /payments/history
+    /payments/receipts/[id]
+    /auctions
+    /auctions/create
+    /auctions/[id]
+    /dividends
+    /payouts
+    /expenses
+    /reports
+    /settings
+    /audit-logs
+
+Reusable frontend components:
+
+    Sidebar
+    TopNavigation
+    DashboardCard
+    DataTable
+    SearchInput
+    Pagination
+    FormField
+    DatePicker
+    CurrencyInput
+    StatusBadge
+    ConfirmationDialog
+    LoadingIndicator
+    ErrorMessage
+    ReceiptTemplate
+    ReportFilters
+
+Frontend conventions:
+    - Use TypeScript types for API data.
+    - Use a reusable API client.
+    - Keep feature-specific components organized.
+    - Protect admin routes.
+    - Do not put database credentials or API secrets in frontend code.
+    - Validate forms on the client and again on the server.
+    - Display loading, empty and error states.
+    - Format money consistently as INR.
+
+============================================================
+14. FINANCIAL BUSINESS WORKFLOWS
+============================================================
+
+WORKFLOW 1: CUSTOMER REGISTRATION
+
+    Start
+      |
+      v
+    Admin opens customer registration
+      |
+      v
+    Enters customer information
+      |
+      v
+    Backend validates required fields
+      |
+      v
+    Check duplicate customer identifiers
+      |
+      v
+    Save customer record
+      |
+      v
+    Generate customer code
+      |
+      v
+    Write audit record
+      |
+      v
+    Return customer details
+      |
+      v
+    End
+
+WORKFLOW 2: CHIT GROUP CREATION
+
+    Start
+      |
+      v
+    Admin creates draft chit group
+      |
+      v
+    Enter chit value, duration and member count
+      |
+      v
+    Validate configuration and agreement
+      |
+      v
+    Complete required legal/registration checks
+      |
+      v
+    Approve and activate group
+      |
+      v
+    Enroll eligible customers
+      |
+      v
+    Generate installment schedule
+      |
+      v
+    End
+
+WORKFLOW 3: PAYMENT COLLECTION
+
+    Start
+      |
+      v
+    Select member and installment
+      |
+      v
+    Check installment balance and status
+      |
+      v
+    Enter payment amount and payment mode
+      |
+      v
+    Validate amount and duplicate request
+      |
+      v
+    Begin database transaction
+      |
+      v
+    Record payment and receipt number
+      |
+      v
+    Update derived installment balance/status
+      |
+      v
+    Write audit record
+      |
+      v
+    Commit transaction
+      |
+      v
+    Display and print receipt
+      |
+      v
+    End
+
+    If any database operation fails, roll back the transaction.
+    Do not issue a successful receipt for a failed transaction.
+
+WORKFLOW 4: AUCTION
+
+    Start
+      |
+      v
+    Create auction for a chit group
+      |
+      v
+    Identify eligible members
+      |
+      v
+    Record bids
+      |
+      v
+    Validate bids against approved rules
+      |
+      v
+    Submit auction result
+      |
+      v
+    Review and approve result
+      |
+      v
+    Calculate dividend allocations
+      |
+      v
+    Verify payout documents
+      |
+      v
+    Approve payout separately
+      |
+      v
+    Record actual disbursement
+      |
+      v
+    Reconcile financial records
+      |
+      v
+    End
+
+FINANCIAL CALCULATION RULE:
+    The application must not hard-code an assumed chit dividend,
+    commission or prize calculation. Store the approved calculation
+    configuration and version, and have a qualified professional
+    verify the formulas against the registered chit agreement and
+    applicable law.
+
+============================================================
+15. SECURITY AND DATA PROTECTION
+============================================================
+
+1. Use ASP.NET Core Identity or an equivalent established identity
+   framework.
+2. Use secure password hashing; never store plain-text passwords.
+3. Use HTTPS in development and production where configured.
+4. Protect all admin APIs with authorization.
+5. Use secure authentication cookie settings or a carefully designed
+   token flow.
+6. Protect against cross-site request forgery when using cookies.
+7. Apply login rate limits.
+8. Validate every request on the backend.
+9. Use EF Core parameterized queries.
+10. Keep secrets out of Git.
+11. Restrict access to KYC files.
+12. Encrypt sensitive data where appropriate.
+13. Keep audit records for financial operations.
+14. Use database backups and test restoration.
+15. Use database transactions for financial operations.
+16. Implement payment idempotency and duplicate prevention.
+17. Do not silently delete or overwrite financial history.
+18. Review security before production deployment.
+
+============================================================
+16. DEVELOPMENT ROADMAP
+============================================================
+
+Estimated schedule:
+    Approximately 10 to 14 weeks, depending on daily study time,
+    implementation complexity and testing.
+
+STAGE 1 - ENVIRONMENT AND PROJECT FOUNDATION
+    Estimated: 3 days
+
+    - Verify .NET SDK.
+    - Verify Node.js.
+    - Install/configure SQL Server and SSMS.
+    - Configure VS Code.
+    - Create ChitPro solution.
+    - Create backend projects.
+    - Configure project references.
+    - Create Next.js frontend.
+    - Run both applications.
+
+STAGE 2 - DATABASE AND ENTITY FRAMEWORK
+    Estimated: 5 days
+
+    - Install EF Core packages.
+    - Configure SQL Server connection.
+    - Create DbContext.
+    - Create entity classes.
+    - Configure relationships.
+    - Create first migration.
+    - Create database.
+    - Verify tables in SSMS.
+
+STAGE 3 - AUTHENTICATION
+    Estimated: 5 days
+
+    - Configure ASP.NET Core Identity.
+    - Create initial admin account safely.
+    - Implement login.
+    - Implement logout.
+    - Implement protected endpoints.
+    - Implement change password.
+    - Test unauthorized access.
+
+STAGE 4 - CUSTOMER MANAGEMENT
+    Estimated: 5 days
+
+    - Customer entity and DTOs.
+    - Customer service.
+    - Customer controller.
+    - Customer create form.
+    - Customer list and search.
+    - Customer detail page.
+    - Update and deactivate.
+    - API testing.
+
+STAGE 5 - CHIT GROUP MANAGEMENT
+    Estimated: 7 days
+
+    - Chit group entity.
+    - Group creation and validation.
+    - Group list and details.
+    - Group status workflow.
+    - Membership management.
+    - Member enrollment.
+    - Group configuration tests.
+
+STAGE 6 - INSTALLMENT MANAGEMENT
+    Estimated: 7 days
+
+    - Installment entity.
+    - Schedule generation service.
+    - Due date calculations.
+    - Duplicate schedule prevention.
+    - Member installment view.
+    - Outstanding balance calculation.
+    - Tests for schedule generation.
+
+STAGE 7 - PAYMENT MANAGEMENT
+    Estimated: 7 days
+
+    - Payment entity.
+    - Payment mode configuration.
+    - Payment collection API.
+    - Database transaction.
+    - Receipt numbering.
+    - Receipt print page.
+    - Payment history.
+    - Reversal workflow.
+    - Duplicate submission tests.
+
+STAGE 8 - AUCTION AND DIVIDEND
+    Estimated: 10 days
+
+    - Auction scheduling.
+    - Eligible member validation.
+    - Bid recording.
+    - Bid validation.
+    - Auction result submission.
+    - Approval workflow.
+    - Dividend calculation engine.
+    - Member-wise allocation.
+    - Calculation tests.
+
+STAGE 9 - PAYOUTS, REPORTS AND DASHBOARD
+    Estimated: 7 days
+
+    - Prize payout workflow.
+    - Payout verification and approval.
+    - Expense management.
+    - Dashboard statistics.
+    - Collection reports.
+    - Outstanding reports.
+    - Customer ledger.
+    - PDF and Excel export.
+    - Reconciliation.
+
+STAGE 10 - TESTING AND DEPLOYMENT
+    Estimated: 7 to 10 days
+
+    - Unit testing.
+    - Integration testing.
+    - Security review.
+    - Financial calculation review.
+    - Error handling.
+    - Logging.
+    - Database backup.
+    - Backup restoration test.
+    - Production hosting configuration.
+    - Deployment and smoke tests.
+
+============================================================
+17. WINDOWS DEVELOPMENT SETUP
+============================================================
+
+Recommended tools:
+
+    1. Visual Studio Code
+       https://code.visualstudio.com/
+
+    2. .NET SDK
+       https://dotnet.microsoft.com/download
+
+    3. SQL Server
+       https://www.microsoft.com/en-us/sql-server/sql-server-downloads
+
+    4. SQL Server Management Studio
+       https://learn.microsoft.com/en-us/ssms/install/install
+
+    5. Node.js
+       https://nodejs.org/
+
+    6. Git
+       https://git-scm.com/
+
+Suggested project directory:
+
+    D:\Projects\ChitPro
+
+Initial PowerShell commands:
+
+    mkdir D:\Projects\ChitPro
+    cd D:\Projects\ChitPro
+    mkdir backend
+    mkdir frontend
+    cd backend
+
+Create solution:
+
+    dotnet new sln -n ChitPro
+
+Create projects:
+
+    dotnet new webapi -n ChitPro.API -f net8.0
+    dotnet new classlib -n ChitPro.Domain -f net8.0
+    dotnet new classlib -n ChitPro.Application -f net8.0
+    dotnet new classlib -n ChitPro.Infrastructure -f net8.0
+    dotnet new xunit -n ChitPro.Tests -f net8.0
+
+Add projects to solution:
+
+    dotnet sln add ChitPro.API
+    dotnet sln add ChitPro.Domain
+    dotnet sln add ChitPro.Application
+    dotnet sln add ChitPro.Infrastructure
+    dotnet sln add ChitPro.Tests
+
+Add project references in a planned dependency direction:
+
+    ChitPro.Application references ChitPro.Domain.
+    ChitPro.Infrastructure references ChitPro.Application
+        and ChitPro.Domain.
+    ChitPro.API references ChitPro.Application
+        and ChitPro.Infrastructure.
+    ChitPro.Tests references the projects being tested.
+
+The Domain project should not depend on API, Infrastructure or
+Entity Framework Core.
+
+Install matching EF Core 8 packages only if continuing with the
+.NET 8 learning target. Keep all EF Core packages on the 8.x line.
+
+Create frontend:
+
+    cd ..\..\frontend
+    npx create-next-app@latest .
+
+Choose:
+    TypeScript: Yes
+    ESLint: Yes
+    Tailwind CSS: Yes
+    App Router: Yes
+    src directory: Yes
+    Import alias: @/*
+
+These are initial setup commands. Add project references, packages,
+connection strings and application code in their respective lessons.
+Do not assume that the database or API is already configured.
+
+============================================================
+18. TESTING REQUIREMENTS
+============================================================
+
+UNIT TESTS:
+    - Customer validation.
+    - Chit group configuration validation.
+    - Installment schedule generation.
+    - Payment balance calculation.
+    - Duplicate payment protection.
+    - Auction bid validation.
+    - Dividend calculation.
+    - Prize payout calculation.
+
+INTEGRATION TESTS:
+    - Admin login.
+    - Customer create and update.
+    - Chit group creation.
+    - Member enrollment.
+    - Installment generation.
+    - Payment collection.
+    - Payment reversal.
+    - Auction approval.
+    - Dividend posting.
+    - Payout approval.
+    - Report reconciliation.
+
+MANUAL TESTS:
+    - Admin login from browser.
+    - Customer registration form.
+    - Search and pagination.
+    - Receipt printing.
+    - Report export.
+    - Error and empty states.
+    - Unauthorized page access.
+
+FINANCIAL TESTS:
+    - No duplicate receipt numbers.
+    - No duplicate installment schedules.
+    - No double collection from repeated requests.
+    - Reversed payments excluded from valid collections.
+    - Posted dividend allocations reconcile to approved totals.
+    - Payout amounts reconcile with approved results.
+    - Reports match underlying transaction records.
+
+============================================================
+19. ACCEPTANCE CRITERIA
+============================================================
+
+The first production candidate must satisfy the following:
+
+[ ] Admin can securely log in and log out.
+[ ] Admin can register customers.
+[ ] Admin can search and update customers.
+[ ] Admin can create and configure chit groups.
+[ ] Admin can enroll customers into groups.
+[ ] The application generates installment schedules.
+[ ] The application prevents duplicate installment generation.
+[ ] Admin can record payments.
+[ ] Each successful payment receives a unique receipt number.
+[ ] Duplicate payment submissions are prevented.
+[ ] Payment corrections are auditable.
+[ ] Admin can schedule auctions.
+[ ] Admin can record bids.
+[ ] Auction results require approval.
+[ ] Dividend calculations follow approved business rules.
+[ ] Prize payouts require verification and approval.
+[ ] Outstanding installment reports are accurate.
+[ ] Collection reports reconcile with payment records.
+[ ] Audit logs record important financial operations.
+[ ] Database backup and restore have been tested.
+[ ] Automated tests cover critical financial workflows.
+[ ] Production deployment uses a supported .NET version.
+
+============================================================
+20. LEGAL AND COMPLIANCE CONSIDERATIONS - INDIA
+============================================================
+
+The application is intended for a chit fund business in India.
+
+Relevant legislation and references include:
+
+    - Chit Funds Act, 1982.
+    - Tamil Nadu Chit Funds Rules, 1984.
+    - Applicable state registration, sanction and filing procedures.
+    - Applicable data protection and cybersecurity requirements.
+
+Official reference:
+    India Code:
+    https://www.indiacode.nic.in/
+
+    RBI:
+    https://www.rbi.org.in/
+
+The software does not itself authorize a company to conduct chit
+business. Required sanction, registration, agreements, filings and
+other compliance obligations must be verified with the competent
+Registrar and qualified legal/compliance professionals.
+
+The application must support the company's approved agreement and
+applicable rules. Do not treat illustrative financial examples as
+legal or accounting advice.
+
+============================================================
+21. FUTURE ENHANCEMENTS
+============================================================
+
+Possible future features:
+
+    - Employee accounts and role-based permissions.
+    - Collection-agent portal.
+    - Customer self-service portal.
+    - Multiple branches.
+    - Mobile application.
+    - SMS reminders.
+    - Email notifications.
+    - WhatsApp integration.
+    - UPI payment gateway integration.
+    - Bank reconciliation integration.
+    - Advanced analytics.
+    - Document verification workflow.
+    - Automated scheduled reports.
+
+These features should be added only after the first release is stable.
+
+============================================================
+22. RECOMMENDED IMPLEMENTATION ORDER
+============================================================
+
+Build in this exact sequence:
+
+    1. Verify Windows development environment.
+    2. Create backend solution and projects.
+    3. Create Next.js frontend.
+    4. Configure SQL Server connection.
+    5. Configure EF Core and DbContext.
+    6. Create initial database migration.
+    7. Implement admin authentication.
+    8. Implement customer management.
+    9. Implement chit group management.
+    10. Implement membership management.
+    11. Implement installment generation.
+    12. Implement payment collection.
+    13. Implement receipt generation.
+    14. Implement auction management.
+    15. Implement dividend calculation.
+    16. Implement prize payout management.
+    17. Implement expenses and reports.
+    18. Implement audit logging.
+    19. Complete automated testing.
+    20. Complete security and compliance review.
+    21. Upgrade to a supported .NET LTS version.
+    22. Deploy and verify production operations.
+
+============================================================
+END OF DOCUMENT
+============================================================
+
+Project:
+    ChitPro - Chit Fund Management System
+
+Initial implementation target:
+    Single company
+    Single branch
+    Admin portal
+    ASP.NET Core Web API
+    Next.js + TypeScript
+    Tailwind CSS
+    SQL Server
+    Layered monolithic architecture
