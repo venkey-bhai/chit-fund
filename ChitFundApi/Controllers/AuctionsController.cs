@@ -14,11 +14,13 @@ namespace ChitFundApi.Controllers
     {
         private readonly ChitFundDbContext _context;
         private readonly IAuditService _auditService;
+        private readonly INotificationService _notifications;
 
-        public AuctionsController(ChitFundDbContext context, IAuditService auditService)
+        public AuctionsController(ChitFundDbContext context, IAuditService auditService, INotificationService notifications)
         {
             _context = context;
             _auditService = auditService;
+            _notifications = notifications;
         }
 
         // GET: api/v1/auctions
@@ -28,8 +30,8 @@ namespace ChitFundApi.Controllers
             var query = _context.Auctions
                 .Include(a => a.ChitGroup)
                 .Include(a => a.Result)
-                    .ThenInclude(r => r.WinnerMember)
-                        .ThenInclude(m => m.Customer)
+                    .ThenInclude(r => r!.WinnerMember)
+                        .ThenInclude(m => m!.Customer)
                 .AsQueryable();
 
             if (chitGroupId.HasValue && chitGroupId.Value > 0)
@@ -75,10 +77,10 @@ namespace ChitFundApi.Controllers
                 .Include(a => a.ChitGroup)
                 .Include(a => a.Bids)
                     .ThenInclude(b => b.ChitMember)
-                        .ThenInclude(m => m.Customer)
+                        .ThenInclude(m => m!.Customer)
                 .Include(a => a.Result)
-                    .ThenInclude(r => r.WinnerMember)
-                        .ThenInclude(m => m.Customer)
+                    .ThenInclude(r => r!.WinnerMember)
+                        .ThenInclude(m => m!.Customer)
                 .FirstOrDefaultAsync(a => a.Id == id);
 
             if (auction == null) return NotFound(ApiResponse<string>.Fail("Auction not found."));
@@ -139,22 +141,31 @@ namespace ChitFundApi.Controllers
         public async Task<IActionResult> SubmitResult(int id, [FromBody] SubmitAuctionResultRequest req)
         {
             // Find existing auction or match by month
-            var auction = await _context.Auctions
+            var auctionQuery = _context.Auctions
                 .Include(a => a.ChitGroup)
-                    .ThenInclude(g => g.Members)
+                    .ThenInclude(g => g!.Members)
                         .ThenInclude(m => m.Customer)
                 .Include(a => a.Result)
-                .FirstOrDefaultAsync(a => a.Id == id || a.AuctionNumber == id);
+                .AsQueryable();
+
+            // With a group id, id is the month number inside that group; never match another group's auction
+            var auction = req.ChitGroupId > 0
+                ? await auctionQuery.FirstOrDefaultAsync(a => a.ChitGroupId == req.ChitGroupId && a.AuctionNumber == id)
+                : await auctionQuery.FirstOrDefaultAsync(a => a.Id == id || a.AuctionNumber == id);
 
             if (auction == null)
             {
-                // Create auction if it didn't exist for month id
-                var firstGroup = await _context.ChitGroups.Include(g => g.Members).ThenInclude(m => m.Customer).FirstOrDefaultAsync();
-                if (firstGroup == null) return BadRequest(ApiResponse<string>.Fail("No chit group available."));
+                // Create auction if it didn't exist for this group's month
+                // Members must be loaded: the new auction links to this tracked group and its Members drive winners/dividends
+                var groupQuery = _context.ChitGroups.Include(g => g.Members).ThenInclude(m => m.Customer);
+                var targetGroup = req.ChitGroupId > 0
+                    ? await groupQuery.FirstOrDefaultAsync(g => g.Id == req.ChitGroupId)
+                    : await groupQuery.FirstOrDefaultAsync();
+                if (targetGroup == null) return BadRequest(ApiResponse<string>.Fail("No chit group available."));
 
                 auction = new Auction
                 {
-                    ChitGroupId = firstGroup.Id,
+                    ChitGroupId = targetGroup.Id,
                     AuctionNumber = id,
                     AuctionDate = DateTime.UtcNow,
                     Status = "Approved",
@@ -166,13 +177,43 @@ namespace ChitFundApi.Controllers
 
             var group = auction.ChitGroup ?? await _context.ChitGroups.Include(g => g.Members).ThenInclude(m => m.Customer).FirstAsync(g => g.Id == auction.ChitGroupId);
 
-            // Resolve winning member
-            int winnerMemberId = req.WinnerMemberId;
-            if (winnerMemberId <= 0 && !string.IsNullOrWhiteSpace(req.WinnerName))
+            // Resolve winning member(s): one or more, up to the scheme's member count
+            var winnerNames = (req.WinnerNames ?? new List<string>())
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .Select(n => n.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (winnerNames.Count == 0 && !string.IsNullOrWhiteSpace(req.WinnerName))
+                winnerNames.Add(req.WinnerName.Trim());
+
+            int maxWinners = Math.Max(1, group.Members.Count > 0 ? group.Members.Count : group.TotalMembers);
+            if (winnerNames.Count > maxWinners)
+                return BadRequest(ApiResponse<string>.Fail($"Maximum {maxWinners} winner(s) allowed for this scheme."));
+
+            var winnerMembers = new List<ChitMember>();
+            foreach (var mid in (req.WinnerMemberIds ?? new List<int>()).Distinct())
             {
-                var member = group.Members.FirstOrDefault(m => m.Customer != null && m.Customer.FullName.ToLower() == req.WinnerName.Trim().ToLower());
-                if (member != null) winnerMemberId = member.Id;
+                var m = group.Members.FirstOrDefault(x => x.Id == mid);
+                if (m == null) continue;
+                if (m.HasPrized && m.PrizedMonthNumber != auction.AuctionNumber)
+                    return BadRequest(ApiResponse<string>.Fail($"{m.Customer?.FullName ?? "Member"} already won in month {m.PrizedMonthNumber}."));
+                var wonOther = await _context.AuctionResults
+                    .Where(r => r.WinnerMemberId == m.Id && r.Status == "Approved" && r.Auction!.ChitGroupId == group.Id && r.Auction.AuctionNumber != auction.AuctionNumber)
+                    .Select(r => (int?)r.Auction!.AuctionNumber).FirstOrDefaultAsync();
+                if (wonOther != null)
+                    return BadRequest(ApiResponse<string>.Fail($"{m.Customer?.FullName ?? "Member"} already won in month {wonOther}."));
+                winnerMembers.Add(m);
             }
+            if (winnerMembers.Count > maxWinners)
+                return BadRequest(ApiResponse<string>.Fail($"Maximum {maxWinners} winner(s) allowed for this scheme."));
+            foreach (var name in winnerNames)
+            {
+                var m = group.Members.FirstOrDefault(x => x.Customer != null && x.Customer.FullName.Equals(name, StringComparison.OrdinalIgnoreCase));
+                if (m != null && !winnerMembers.Contains(m)) winnerMembers.Add(m);
+            }
+
+            int winnerMemberId = req.WinnerMemberId;
+            if (winnerMemberId <= 0 && winnerMembers.Count > 0) winnerMemberId = winnerMembers[0].Id;
 
             if (winnerMemberId <= 0 && group.Members.Any())
             {
@@ -215,12 +256,22 @@ namespace ChitFundApi.Controllers
             await _context.SaveChangesAsync();
 
             // Mark winner member as prized
-            var winner = await _context.ChitMembers.FindAsync(winnerMemberId);
-            if (winner != null)
+            // Reset earlier winners of this month (re-submission), then mark all current winners
+            foreach (var prev in group.Members.Where(m => m.HasPrized && m.PrizedMonthNumber == auction.AuctionNumber))
             {
-                winner.HasPrized = true;
-                winner.PrizedMonthNumber = auction.AuctionNumber;
-                winner.PrizedAmount = grossPrize;
+                prev.HasPrized = false;
+                prev.PrizedMonthNumber = null;
+                prev.PrizedAmount = null;
+            }
+
+            var toMark = winnerMembers.Count > 0
+                ? winnerMembers
+                : group.Members.Where(m => m.Id == winnerMemberId).ToList();
+            foreach (var w in toMark)
+            {
+                w.HasPrized = true;
+                w.PrizedMonthNumber = auction.AuctionNumber;
+                w.PrizedAmount = grossPrize;
             }
 
             // Distribute dividends to all members
@@ -268,6 +319,8 @@ namespace ChitFundApi.Controllers
             await _context.SaveChangesAsync();
 
             await _auditService.LogAsync(1, "APPROVE_AUCTION", "AuctionResult", result.Id.ToString(), $"Approved Month {auction.AuctionNumber} auction with bid discount ₹{req.DiscountAmount:N2}");
+
+            _notifications.QueueAuctionResult(auction.Id); // tell all members (background)
 
             return Ok(new
             {

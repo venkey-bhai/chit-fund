@@ -10,6 +10,7 @@ export default function AppShell({ children }) {
   const pathname = usePathname();
   const router = useRouter();
   const [ready, setReady] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const isLoginPage = pathname === '/login';
 
   useEffect(() => {
@@ -27,6 +28,10 @@ export default function AppShell({ children }) {
     setReady(true);
   }, [pathname, isLoginPage, router]);
 
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
+
   if (!ready) {
     return (
       <div className="flex h-screen w-screen items-center justify-center">
@@ -37,12 +42,17 @@ export default function AppShell({ children }) {
 
   if (isLoginPage) return <>{children}</>;
 
+  // Passbook opens in its own window: no sidebar/navbar, page scrolls and prints normally
+  if (pathname.startsWith('/customers/passbook')) {
+    return <div className="min-h-dvh bg-slate-50">{children}</div>;
+  }
+
   return (
-    <div className="flex h-screen w-screen overflow-hidden">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-        <Navbar />
-        <main className="flex-1 overflow-y-auto p-3.5 sm:p-4 bg-slate-50">
+    <div className="flex h-dvh w-full overflow-hidden">
+      <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <div className="flex-1 flex flex-col min-w-0 h-dvh overflow-hidden">
+        <Navbar onMenu={() => setMenuOpen(true)} />
+        <main className="flex-1 overflow-y-auto p-2.5 sm:p-4 bg-slate-50">
           {children}
         </main>
       </div>

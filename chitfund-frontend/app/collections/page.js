@@ -23,8 +23,13 @@ import {
   Printer, 
   Trash2, 
   X,
-  FileCheck
+  FileCheck,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
+import DateInput from '@/components/DateInput';
+
+const PAGE_SIZE = 10;
 
 function CollectionsContent() {
   const searchParams = useSearchParams();
@@ -32,6 +37,7 @@ function CollectionsContent() {
   const [chitGroups, setChitGroups] = useState([]);
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -196,20 +202,26 @@ function CollectionsContent() {
     return matchesSearch && matchesGroup;
   });
 
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(filteredCollections.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageStart = (currentPage - 1) * PAGE_SIZE;
+  const pagedCollections = filteredCollections.slice(pageStart, pageStart + PAGE_SIZE);
+
   return (
-    <div className="space-y-2.5">
+    <div className="flex flex-col h-full min-h-0 gap-2.5">
       {/* Grid: Form on Left/Top + Collections History */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 flex-1 min-h-0">
         {/* PAYMENT ENTRY FORM (Specified in chitfund.txt) */}
-        <div className="bg-white rounded-lg border border-slate-200 shadow-2xs p-3 space-y-2.5">
-          <div className="border-b border-slate-100 pb-2">
+        <div className="bg-white rounded-lg border border-slate-200 shadow-2xs p-3 flex flex-col gap-2.5 lg:self-start lg:max-h-[calc(100vh-100px)]">
+          <div className="border-b border-slate-100 pb-2 shrink-0">
             <h2 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
               <ReceiptIndianRupee className="w-4 h-4 text-indigo-600" />
               <span>Record Payment Entry</span>
             </h2>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-2 text-xs">
+          <form onSubmit={handleSubmit} className="space-y-2 text-xs lg:overflow-y-auto lg:pr-1 min-h-0">
             {formError && (
               <div className="p-2 bg-rose-50 border border-rose-200 text-rose-800 rounded text-xs">
                 {formError}
@@ -239,10 +251,9 @@ function CollectionsContent() {
             {/* FIELD 1: collection date: with input field */}
             <div className="p-2 bg-indigo-50/50 rounded-md border border-indigo-100 space-y-0.5">
               <label className="block font-bold text-indigo-950 text-[11px]">
-                Collection Date: with input field *
+                Collection Date *
               </label>
-              <input
-                type="date"
+              <DateInput
                 required
                 value={formData.collectionDate}
                 onChange={(e) => setFormData({ ...formData, collectionDate: e.target.value })}
@@ -253,10 +264,9 @@ function CollectionsContent() {
             {/* FIELD 2: chit date: with input field */}
             <div className="p-2 bg-indigo-50/50 rounded-md border border-indigo-100 space-y-0.5">
               <label className="block font-bold text-indigo-950 text-[11px]">
-                Chit Date: with input field *
+                Chit Date *
               </label>
-              <input
-                type="date"
+              <DateInput
                 required
                 value={formData.chitDate}
                 onChange={(e) => setFormData({ ...formData, chitDate: e.target.value })}
@@ -267,7 +277,7 @@ function CollectionsContent() {
             {/* FIELD 3: chit person: with input field */}
             <div className="p-2 bg-indigo-50/50 rounded-md border border-indigo-100 space-y-1">
               <label className="block font-bold text-indigo-950 text-[11px]">
-                Chit Person: with input field *
+                Chit Person *
               </label>
               
               {members.length > 0 && (
@@ -298,7 +308,7 @@ function CollectionsContent() {
             {/* FIELD 4: amount: with input field */}
             <div className="p-2 bg-indigo-50/50 rounded-md border border-indigo-100 space-y-0.5">
               <label className="block font-bold text-indigo-950 text-[11px]">
-                Amount: with input field (₹) *
+                Amount (₹) *
               </label>
               <input
                 type="number"
@@ -371,7 +381,7 @@ function CollectionsContent() {
         </div>
 
         {/* COLLECTIONS LEDGER & TABLE (Right 2 cols) */}
-        <div className="lg:col-span-2 space-y-2.5">
+        <div className="lg:col-span-2 flex flex-col gap-2.5 min-h-0">
           {/* Filter Bar */}
           <div className="bg-white rounded-lg border border-slate-200 p-2 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-2">
             <div className="relative flex-1 w-full">
@@ -380,7 +390,7 @@ function CollectionsContent() {
                 type="text"
                 placeholder="Search person, receipt #, scheme..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
                 className="w-full pl-8 pr-3 py-1.5 rounded border border-slate-200 text-xs focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
               />
             </div>
@@ -388,7 +398,7 @@ function CollectionsContent() {
             <div className="w-full sm:w-auto">
               <select
                 value={filterGroup}
-                onChange={(e) => setFilterGroup(e.target.value)}
+                onChange={(e) => { setFilterGroup(e.target.value); setPage(1); }}
                 className="w-full sm:w-auto px-2.5 py-1.5 rounded border border-slate-200 text-xs bg-white font-medium"
               >
                 <option value="">All Chit Schemes</option>
@@ -402,8 +412,8 @@ function CollectionsContent() {
           </div>
 
           {/* Table with Stable Headers */}
-          <div className="bg-white rounded-lg border border-slate-200 shadow-2xs overflow-hidden">
-            <div className="overflow-auto max-h-[calc(100vh-175px)]">
+          <div className="bg-white rounded-lg border border-slate-200 shadow-2xs overflow-hidden flex-1 min-h-0 flex flex-col">
+            <div className="overflow-auto flex-1 min-h-0">
               <table className="w-full text-left border-collapse text-xs">
                 <thead className="sticky top-0 z-10 bg-slate-100 shadow-2xs">
                   <tr className="border-b border-slate-200 text-slate-700 font-bold uppercase text-[10px] tracking-wider">
@@ -432,7 +442,7 @@ function CollectionsContent() {
                       </td>
                     </tr>
                   ) : (
-                    filteredCollections.map((c) => (
+                    pagedCollections.map((c) => (
                       <tr key={c.id} className="hover:bg-slate-50 transition-colors">
                         <td className="py-2 px-2.5 font-mono font-bold text-indigo-700 text-xs">
                           {c.receiptNumber}
@@ -492,13 +502,45 @@ function CollectionsContent() {
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination */}
+            <div className="shrink-0 px-3 py-1.5 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs text-slate-600">
+              <span>
+                {filteredCollections.length === 0
+                  ? '0 records'
+                  : `${pageStart + 1}–${Math.min(pageStart + PAGE_SIZE, filteredCollections.length)} of ${filteredCollections.length}`}
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setPage(currentPage - 1)}
+                  disabled={currentPage <= 1}
+                  className="p-1 rounded border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Previous page"
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <span className="font-semibold text-slate-700 min-w-[64px] text-center">
+                  Page {currentPage} / {totalPages}
+                </span>
+                <button
+                  onClick={() => setPage(currentPage + 1)}
+                  disabled={currentPage >= totalPages}
+                  className="p-1 rounded border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Next page"
+                  aria-label="Next page"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* RECEIPT PREVIEW MODAL (Compact) */}
       {selectedReceipt && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-2xs flex items-center justify-center p-3">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-2xs flex items-center justify-center p-3 overflow-y-auto">
           <div className="bg-white rounded-xl max-w-sm w-full shadow-xl border border-slate-200 overflow-hidden">
             <div className="p-4 bg-slate-900 text-white text-center relative">
               <button

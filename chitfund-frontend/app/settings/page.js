@@ -15,6 +15,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { getCompanySettings, updateCompanySettings } from '@/lib/api';
+import DateInput from '@/components/DateInput';
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState({
@@ -193,8 +194,7 @@ export default function SettingsPage() {
                   <Calendar className="w-3 h-3 text-slate-400" />
                   FY Start Date
                 </label>
-                <input
-                  type="date"
+                <DateInput
                   value={settings.financialYearStart}
                   onChange={(e) => setSettings({ ...settings, financialYearStart: e.target.value })}
                   className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-md text-xs focus:outline-hidden focus:ring-1 focus:ring-indigo-500 focus:bg-white"

@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { getExpenses, createExpense, deleteExpense } from '@/lib/api';
 import { formatCurrency, formatDate, formatDateInput } from '@/lib/utils';
 import { PlusCircle, Trash2, X } from 'lucide-react';
+import DateInput from '@/components/DateInput';
 
 function ExpensesContent() {
   const [expenses, setExpenses] = useState([]);
@@ -81,7 +82,7 @@ function ExpensesContent() {
   const totalExpense = expenses.reduce((acc, e) => acc + (e.amount || 0), 0);
 
   return (
-    <div className="space-y-2.5">
+    <div className="flex flex-col h-full min-h-0 gap-2.5">
       {/* Summary Row & Actions (Page Heading Removed) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         <div className="bg-white rounded-lg p-2.5 border border-slate-200 shadow-2xs flex items-center justify-between">
@@ -121,8 +122,8 @@ function ExpensesContent() {
       </div>
 
       {/* Expenses Table with Sticky Headers */}
-      <div className="bg-white rounded-lg border border-slate-200 shadow-2xs overflow-hidden">
-        <div className="overflow-auto max-h-[calc(100vh-150px)]">
+      <div className="bg-white rounded-lg border border-slate-200 shadow-2xs overflow-hidden flex-1 min-h-0 flex flex-col">
+        <div className="overflow-auto flex-1 min-h-0">
           <table className="w-full text-left border-collapse text-xs">
             <thead className="sticky top-0 z-10 bg-slate-100 shadow-2xs">
               <tr className="border-b border-slate-200 text-slate-700 font-bold uppercase text-[10px] tracking-wider">
@@ -182,7 +183,7 @@ function ExpensesContent() {
 
       {/* ADD EXPENSE MODAL (Compact) */}
       {isAddOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-2xs flex items-center justify-center p-3">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-2xs flex items-center justify-center p-3 overflow-y-auto">
           <div className="bg-white rounded-xl max-w-sm w-full shadow-xl border border-slate-200 overflow-hidden">
             <div className="px-4 py-2.5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <h3 className="font-bold text-slate-900 text-xs">Record Company Expense</h3>
@@ -243,8 +244,7 @@ function ExpensesContent() {
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-0.5">Expense Date *</label>
-                  <input
-                    type="date"
+                  <DateInput
                     required
                     value={formData.expenseDate}
                     onChange={(e) => setFormData({ ...formData, expenseDate: e.target.value })}

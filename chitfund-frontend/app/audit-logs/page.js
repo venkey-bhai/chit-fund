@@ -9,6 +9,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { getAuditLogs } from '@/lib/api';
+import { formatDateTime } from '@/lib/utils';
 
 function AuditLogsContent() {
   const [logs, setLogs] = useState([]);
@@ -64,7 +65,7 @@ function AuditLogsContent() {
   };
 
   return (
-    <div className="space-y-2.5">
+    <div className="flex flex-col h-full min-h-0 gap-2.5">
       {/* Filter and Search Bar (Page Heading Removed) */}
       <div className="bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs flex flex-col md:flex-row gap-2 items-center justify-between">
         <div className="relative w-full md:w-72">
@@ -107,8 +108,8 @@ function AuditLogsContent() {
       </div>
 
       {/* Table of Audit Logs with Sticky Headers */}
-      <div className="bg-white rounded-lg border border-slate-200 shadow-2xs overflow-hidden">
-        <div className="overflow-auto max-h-[calc(100vh-140px)]">
+      <div className="bg-white rounded-lg border border-slate-200 shadow-2xs overflow-hidden flex-1 min-h-0 flex flex-col">
+        <div className="overflow-auto flex-1 min-h-0">
           <table className="w-full text-left border-collapse text-xs">
             <thead className="sticky top-0 z-10 bg-slate-100 shadow-2xs">
               <tr className="border-b border-slate-200 text-[10px] font-bold text-slate-700 uppercase tracking-wider">
@@ -138,7 +139,7 @@ function AuditLogsContent() {
                 filteredLogs.map((log) => (
                   <tr key={log.id} className="hover:bg-slate-50 transition-colors">
                     <td className="py-2 px-2.5 text-slate-500 font-mono text-[10px] whitespace-nowrap">
-                      {new Date(log.createdAt).toLocaleString()}
+                      {formatDateTime(log.createdAt)}
                     </td>
                     <td className="py-2 px-2.5 whitespace-nowrap">
                       <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold border ${getActionBadge(log.action)}`}>

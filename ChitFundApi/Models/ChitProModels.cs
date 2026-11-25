@@ -301,10 +301,10 @@ namespace ChitFundApi.Models
     public class CompanySetting
     {
         public int Id { get; set; }
-        public string CompanyName { get; set; } = "ChitPro Financial Services";
-        public string? Address { get; set; } = "100, Finance Hub, Mount Road, Chennai, Tamil Nadu";
-        public string? Phone { get; set; } = "+91 98765 43210";
-        public string? Email { get; set; } = "contact@chitpro.com";
+        public string CompanyName { get; set; } = "";
+        public string? Address { get; set; } = "";
+        public string? Phone { get; set; } = "";
+        public string? Email { get; set; } = "";
         public string CurrencyCode { get; set; } = "INR";
         public DateTime? FinancialYearStart { get; set; } = new DateTime(2026, 4, 1);
         public string ReceiptPrefix { get; set; } = "REC";

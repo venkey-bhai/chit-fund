@@ -184,7 +184,7 @@ export default function DashboardPage() {
                   </div>
 
                   <Link
-                    href={`/chits/${c.id}`}
+                    href={`/schedules`}
                     className="px-2.5 py-1 rounded text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-1 self-end sm:self-center shadow-2xs"
                   >
                     <CalendarClock className="w-3 h-3 text-indigo-600" />

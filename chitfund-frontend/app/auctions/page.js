@@ -7,6 +7,9 @@ import {
   recordAuction 
 } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import Pagination from '@/components/Pagination';
+
+const PAGE_SIZE = 10;
 import { 
   Gavel, 
   Trophy, 
@@ -18,12 +21,12 @@ export default function AuctionsPage() {
   const [selectedGroupId, setSelectedGroupId] = useState('');
   const [scheduleData, setScheduleData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
 
   // Modal State
   const [activeAuction, setActiveAuction] = useState(null);
   const [bidAmount, setBidAmount] = useState('');
-  const [winnerName, setWinnerName] = useState('');
-  const [winnerMemberId, setWinnerMemberId] = useState('');
+  const [selectedIds, setSelectedIds] = useState([]);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -67,13 +70,22 @@ export default function AuctionsPage() {
     e.preventDefault();
     if (!activeAuction) return;
 
+    if (selectedIds.length === 0) {
+      alert('Select at least one winner member.');
+      return;
+    }
+    const names = members.filter((m) => selectedIds.includes(m.id)).map((m) => m.name);
+
     setSubmitting(true);
     try {
       await recordAuction(activeAuction.id, {
         chitScheduleId: activeAuction.id,
-        winnerMemberId: winnerMemberId ? parseInt(winnerMemberId, 10) : 0,
-        winnerName: winnerName || 'Winner Member',
+        winnerMemberId: selectedIds[0],
+        winnerName: names[0],
+        winnerNames: names,
+        winnerMemberIds: selectedIds,
         bidAmount: parseFloat(bidAmount) || 0,
+        discountAmount: parseFloat(bidAmount) || 0,
       });
 
       setActiveAuction(null);
@@ -87,9 +99,24 @@ export default function AuctionsPage() {
 
   const group = scheduleData?.chitGroup;
   const schedules = scheduleData?.schedules || [];
+  const totalPages = Math.max(1, Math.ceil(schedules.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedSchedules = schedules.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const members = scheduleData?.members || [];
+
+  // Members who already won in another month stay visible but disabled
+  const selectableMembers = members.filter(
+    (m) => !(m.hasPrized && m.prizedMonthNumber !== activeAuction?.monthNumber)
+  );
+  const toggleMember = (id) =>
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const toggleAll = () =>
+    setSelectedIds((prev) =>
+      prev.length === selectableMembers.length ? [] : selectableMembers.map((m) => m.id)
+    );
 
   return (
-    <div className="space-y-2.5">
+    <div className="flex flex-col h-full min-h-0 gap-2.5">
       {/* Compact Scheme Selector Toolbar (Page Heading Removed) */}
       <div className="bg-white rounded-lg border border-slate-200 p-2 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div className="flex items-center gap-2">
@@ -98,7 +125,7 @@ export default function AuctionsPage() {
           </label>
           <select
             value={selectedGroupId}
-            onChange={(e) => setSelectedGroupId(e.target.value)}
+            onChange={(e) => { setSelectedGroupId(e.target.value); setPage(1); }}
             className="px-2.5 py-1 rounded border border-slate-300 bg-white text-xs font-bold text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
           >
             {chitGroups.map((g) => (
@@ -117,9 +144,9 @@ export default function AuctionsPage() {
       </div>
 
       {group && (
-        <div className="space-y-2.5">
+        <div className="flex flex-col flex-1 min-h-0 gap-2.5">
           {/* Quick Metric Cards (Compact) */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+          {/* <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
             <div className="bg-white rounded-lg p-2.5 border border-slate-200 shadow-2xs">
               <span className="text-[10px] text-slate-500 font-semibold uppercase">Total Value</span>
               <div className="text-sm font-bold text-indigo-700 mt-0.5">{formatCurrency(group.totalAmount)}</div>
@@ -136,12 +163,12 @@ export default function AuctionsPage() {
               <span className="text-[10px] text-slate-500 font-semibold uppercase">Foreman Fee</span>
               <div className="text-sm font-bold text-amber-600 mt-0.5">{group.foremanCommissionPercentage}% ({formatCurrency(group.totalAmount * (group.foremanCommissionPercentage / 100))})</div>
             </div>
-          </div>
+          </div> */}
 
           {/* Auctions List in Scrollable Container */}
-          <div className="bg-white rounded-lg border border-slate-200 shadow-2xs overflow-hidden">
-            <div className="overflow-auto max-h-[calc(100vh-215px)] divide-y divide-slate-100">
-              {schedules.map((s) => (
+          <div className="bg-white rounded-lg border border-slate-200 shadow-2xs overflow-hidden flex-1 min-h-0 flex flex-col">
+            <div className="overflow-auto flex-1 min-h-0 divide-y divide-slate-100">
+              {pagedSchedules.map((s) => (
                 <div
                   key={s.id}
                   className="p-3 hover:bg-slate-50 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs"
@@ -198,8 +225,11 @@ export default function AuctionsPage() {
                       onClick={() => {
                         setActiveAuction(s);
                         setBidAmount(s.bidAmount > 0 ? s.bidAmount : '');
-                        setWinnerMemberId(s.winnerMemberId || '');
-                        setWinnerName(s.winnerMemberName || '');
+                        setSelectedIds(
+                          members
+                            .filter((m) => m.hasPrized && m.prizedMonthNumber === s.monthNumber)
+                            .map((m) => m.id)
+                        );
                       }}
                       className="px-2.5 py-1 rounded text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors flex items-center gap-1 shadow-2xs whitespace-nowrap"
                     >
@@ -210,13 +240,14 @@ export default function AuctionsPage() {
                 </div>
               ))}
             </div>
+            <Pagination page={currentPage} totalPages={totalPages} onChange={setPage} />
           </div>
         </div>
       )}
 
       {/* AUCTION MODAL (Compact) */}
       {activeAuction && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-2xs flex items-center justify-center p-3">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-2xs flex items-center justify-center p-3 overflow-y-auto">
           <div className="bg-white rounded-xl max-w-sm w-full shadow-xl border border-slate-200 overflow-hidden">
             <div className="px-4 py-2.5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <h3 className="font-bold text-slate-900 text-xs">
@@ -232,17 +263,47 @@ export default function AuctionsPage() {
 
             <form onSubmit={handleAuctionSubmit} className="p-4 space-y-2.5 text-xs">
               <div>
-                <label className="block font-semibold text-slate-700 mb-0.5">
-                  Winner Chit Person *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Suresh Kumar"
-                  value={winnerName}
-                  onChange={(e) => setWinnerName(e.target.value)}
-                  className="w-full px-2.5 py-1.5 rounded border border-slate-300 font-semibold text-xs"
-                />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-semibold text-slate-700">
+                    Winner Chit Person(s) * <span className="text-slate-400 font-normal">({selectedIds.length} selected / {members.length} members)</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={toggleAll}
+                    className="text-[10px] font-semibold text-indigo-700 hover:underline"
+                  >
+                    {selectedIds.length === selectableMembers.length && selectableMembers.length > 0 ? 'Clear all' : 'Select all'}
+                  </button>
+                </div>
+                <div className="space-y-1 max-h-48 overflow-y-auto border border-slate-200 rounded p-1.5">
+                  {members.length === 0 && (
+                    <p className="text-[11px] text-slate-500 p-1">No members enrolled in this scheme yet.</p>
+                  )}
+                  {members.map((m) => {
+                    const wonEarlier = m.hasPrized && m.prizedMonthNumber !== activeAuction.monthNumber;
+                    const checked = selectedIds.includes(m.id);
+                    return (
+                      <label
+                        key={m.id}
+                        className={`flex items-center gap-2 px-1.5 py-1 rounded ${wonEarlier ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : 'hover:bg-indigo-50 cursor-pointer text-slate-900'}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={wonEarlier}
+                          onChange={() => toggleMember(m.id)}
+                          className="accent-indigo-600"
+                        />
+                        <span className="font-semibold flex-1">{m.name}</span>
+                        {wonEarlier && (
+                          <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1">
+                            Won Month {m.prizedMonthNumber}
+                          </span>
+                        )}
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
 
               <div>
@@ -252,7 +313,7 @@ export default function AuctionsPage() {
                 <input
                   type="number"
                   min="0"
-                  step="1000"
+                  step="any"
                   required
                   placeholder="e.g. 150000"
                   value={bidAmount}

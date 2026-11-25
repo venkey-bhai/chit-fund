@@ -82,6 +82,7 @@ export const deleteMember = (id) => deleteCustomer(id);
 export const getChitGroups = () => fetchApi('/api/v1/chit-groups');
 export const getChitGroupById = (id) => fetchApi(`/api/v1/chit-groups/${id}`);
 export const createChitGroup = (data) => fetchApi('/api/v1/chit-groups', { method: 'POST', body: JSON.stringify(data) });
+export const updateChitGroup = (id, data) => fetchApi(`/api/v1/chit-groups/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 export const deleteChitGroup = (id) => fetchApi(`/api/v1/chit-groups/${id}`, { method: 'DELETE' });
 export const enrollMemberInGroup = (groupId, data) => fetchApi(`/api/v1/chit-groups/${groupId}/members`, { method: 'POST', body: JSON.stringify(data) });
 
@@ -134,3 +135,8 @@ export const getAuditLogs = (params = {}) => {
 // FR-16: Company Settings
 export const getCompanySettings = () => fetchApi('/api/v1/settings/company');
 export const updateCompanySettings = (data) => fetchApi('/api/v1/settings/company', { method: 'PUT', body: JSON.stringify(data) });
+
+// Notifications (SMS + WhatsApp)
+export const getNotifications = (take = 100) => fetchApi(`/api/v1/notifications?take=${take}`);
+export const sendCustomMessage = (data) => fetchApi('/api/v1/notifications/send', { method: 'POST', body: JSON.stringify(data) });
+export const sendDueReminders = () => fetchApi('/api/v1/notifications/send-reminders', { method: 'POST' });

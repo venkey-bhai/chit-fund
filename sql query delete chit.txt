@@ -1,0 +1,51 @@
+USE ChitProDB;
+GO
+
+DECLARE @ChitGroupId INT = 1;   -- <-- change to the chit's Id
+
+-- Check this is the right chit before deleting
+SELECT Id, GroupCode, GroupName FROM ChitGroups WHERE Id = @ChitGroupId;
+
+BEGIN TRY
+    BEGIN TRANSACTION;
+
+    -- 1. Payments (they block the delete: FK_Payments_ChitGroups)
+    DELETE FROM Payments WHERE ChitGroupId = @ChitGroupId;
+
+    -- 2. Auction children
+    DELETE FROM PrizePayouts
+     WHERE AuctionResultId IN (SELECT r.Id FROM AuctionResults r
+                               JOIN Auctions a ON a.Id = r.AuctionId
+                               WHERE a.ChitGroupId = @ChitGroupId);
+
+    DELETE FROM DividendAllocations
+     WHERE AuctionResultId IN (SELECT r.Id FROM AuctionResults r
+                               JOIN Auctions a ON a.Id = r.AuctionId
+                               WHERE a.ChitGroupId = @ChitGroupId)
+        OR ChitMemberId   IN (SELECT Id FROM ChitMembers WHERE ChitGroupId = @ChitGroupId);
+
+    DELETE FROM AuctionBids
+     WHERE AuctionId IN (SELECT Id FROM Auctions WHERE ChitGroupId = @ChitGroupId)
+        OR ChitMemberId IN (SELECT Id FROM ChitMembers WHERE ChitGroupId = @ChitGroupId);
+
+    DELETE FROM AuctionResults
+     WHERE AuctionId IN (SELECT Id FROM Auctions WHERE ChitGroupId = @ChitGroupId);
+
+    DELETE FROM Auctions WHERE ChitGroupId = @ChitGroupId;
+
+    -- 3. Members' installments, then members
+    DELETE FROM Installments
+     WHERE ChitMemberId IN (SELECT Id FROM ChitMembers WHERE ChitGroupId = @ChitGroupId);
+
+    DELETE FROM ChitMembers WHERE ChitGroupId = @ChitGroupId;
+
+    -- 4. Finally the chit itself
+    DELETE FROM ChitGroups WHERE Id = @ChitGroupId;
+
+    COMMIT TRANSACTION;
+    PRINT 'Chit group deleted.';
+END TRY
+BEGIN CATCH
+    IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+    PRINT 'Failed, nothing was deleted: ' + ERROR_MESSAGE();
+END CATCH;

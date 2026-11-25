@@ -93,6 +93,19 @@ namespace ChitFundApi.DTOs
         public string? AgreementReference { get; set; }
     }
 
+    // Edit scheme: only fields that don't invalidate already-generated installments
+    public class ChitGroupUpdateRequest
+    {
+        public string GroupName { get; set; } = string.Empty;
+        public string? GroupCode { get; set; }
+        public int TotalMembers { get; set; }
+        public int MaxMembers { get; set; }
+        public int GraceDays { get; set; }
+        public string? GracePeriod { get; set; }
+        public decimal ForemanCommissionPercentage { get; set; }
+        public string? Status { get; set; }
+    }
+
     // FR-05 Member Enrollment DTO
     public class EnrollMemberRequest
     {
@@ -136,8 +149,13 @@ namespace ChitFundApi.DTOs
 
     public class SubmitAuctionResultRequest
     {
+        // Chit group the month belongs to (the route id is only a month number for schedule rows)
+        public int ChitGroupId { get; set; }
         public int WinnerMemberId { get; set; }
         public string? WinnerName { get; set; }
+        // Optional: one or more winners (names). First one is the primary winner.
+        public List<string>? WinnerNames { get; set; }
+        public List<int>? WinnerMemberIds { get; set; }
         public decimal DiscountAmount { get; set; }
     }
 

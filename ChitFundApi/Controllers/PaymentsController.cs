@@ -14,11 +14,13 @@ namespace ChitFundApi.Controllers
     {
         private readonly ChitFundDbContext _context;
         private readonly IAuditService _auditService;
+        private readonly INotificationService _notifications;
 
-        public PaymentsController(ChitFundDbContext context, IAuditService auditService)
+        public PaymentsController(ChitFundDbContext context, IAuditService auditService, INotificationService notifications)
         {
             _context = context;
             _auditService = auditService;
+            _notifications = notifications;
         }
 
         // GET: api/v1/payments & api/collections
@@ -198,6 +200,8 @@ namespace ChitFundApi.Controllers
             await _context.SaveChangesAsync();
 
             await _auditService.LogAsync(1, "RECORD_PAYMENT", "Payment", payment.Id.ToString(), $"Collected ₹{payment.Amount:N2} from {payment.ChitPerson} ({receiptNumber})");
+
+            _notifications.QueuePaymentReceipt(payment.Id); // SMS + WhatsApp receipt (background)
 
             var modeObj = await _context.PaymentModes.FindAsync(modeId);
 

@@ -21,6 +21,21 @@ namespace ChitFundApi.Controllers
             _auditService = auditService;
         }
 
+        // Mobile must be exactly 10 digits; Aadhaar/PAN letters and digits only
+        private static string? ValidateIdentity(CustomerCreateDto dto)
+        {
+            if (!System.Text.RegularExpressions.Regex.IsMatch(dto.Mobile.Trim(), @"^\d{10}$"))
+            {
+                return "Mobile number must be exactly 10 digits.";
+            }
+            if (!string.IsNullOrWhiteSpace(dto.AadhaarOrPan) &&
+                !System.Text.RegularExpressions.Regex.IsMatch(dto.AadhaarOrPan.Trim(), @"^[a-zA-Z0-9]+$"))
+            {
+                return "Aadhaar / PAN can contain only letters and digits.";
+            }
+            return null;
+        }
+
         // GET: api/v1/customers
         [HttpGet]
         public async Task<IActionResult> GetAll([FromQuery] string? search)
@@ -152,10 +167,20 @@ namespace ChitFundApi.Controllers
             {
                 return BadRequest(ApiResponse<string>.Fail("Mobile number is required."));
             }
+            var validationError = ValidateIdentity(dto);
+            if (validationError != null)
+            {
+                return BadRequest(ApiResponse<string>.Fail(validationError));
+            }
 
             // Generate unique customer code CUS-XXXX
-            int count = await _context.Customers.CountAsync();
-            string code = $"CUS-{(count + 1):D4}";
+            // Use highest existing number (not row count) so deletes can't cause duplicate codes
+            var codes = await _context.Customers.Select(c => c.CustomerCode).ToListAsync();
+            int maxNumber = codes
+                .Select(c => int.TryParse(c.Replace("CUS-", ""), out var n) ? n : 0)
+                .DefaultIfEmpty(0)
+                .Max();
+            string code = $"CUS-{(maxNumber + 1):D4}";
 
             var customer = new Customer
             {
@@ -192,6 +217,16 @@ namespace ChitFundApi.Controllers
                 return NotFound(ApiResponse<string>.Fail("Customer not found."));
             }
 
+            if (string.IsNullOrWhiteSpace(dto.FullName) || string.IsNullOrWhiteSpace(dto.Mobile))
+            {
+                return BadRequest(ApiResponse<string>.Fail("Name and Mobile number are required."));
+            }
+            var validationError = ValidateIdentity(dto);
+            if (validationError != null)
+            {
+                return BadRequest(ApiResponse<string>.Fail(validationError));
+            }
+
             customer.FullName = dto.FullName.Trim();
             customer.Mobile = dto.Mobile.Trim();
             customer.Email = dto.Email?.Trim();
@@ -208,9 +243,9 @@ namespace ChitFundApi.Controllers
             return Ok(customer);
         }
 
-        // DELETE: api/v1/customers/{id} (Soft-deactivate per FR-03)
+        // DELETE: api/v1/customers/{id} (permanent delete; blocked if financial history exists)
         [HttpDelete("{id}")]
-        public async Task<IActionResult> Deactivate(int id)
+        public async Task<IActionResult> Delete(int id)
         {
             var customer = await _context.Customers.FindAsync(id);
             if (customer == null)
@@ -218,12 +253,20 @@ namespace ChitFundApi.Controllers
                 return NotFound(ApiResponse<string>.Fail("Customer not found."));
             }
 
-            customer.Status = "Deactivated";
-            customer.UpdatedAt = DateTime.UtcNow;
+            bool hasHistory = await _context.ChitMembers.AnyAsync(m => m.CustomerId == id)
+                || await _context.Payments.AnyAsync(p => p.CustomerId == id);
+            if (hasHistory)
+            {
+                return BadRequest(ApiResponse<string>.Fail("Cannot delete: customer has chit memberships or payments. Deactivate the customer instead."));
+            }
+
+            var docs = _context.Set<CustomerDocument>().Where(d => d.CustomerId == id);
+            _context.RemoveRange(docs);
+            _context.Customers.Remove(customer);
             await _context.SaveChangesAsync();
 
-            await _auditService.LogAsync(1, "DEACTIVATE_CUSTOMER", "Customer", customer.Id.ToString());
-            return Ok(ApiResponse<string>.Ok("Customer deactivated successfully. Financial history preserved."));
+            await _auditService.LogAsync(1, "DELETE_CUSTOMER", "Customer", id.ToString(), $"Deleted {customer.FullName}");
+            return Ok(ApiResponse<string>.Ok("Customer deleted successfully."));
         }
 
         // PUT: api/v1/customers/{id}/status (checked = Active, unchecked = Deactivated)

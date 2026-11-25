@@ -43,7 +43,7 @@ function ReportsContent() {
   }
 
   return (
-    <div className="space-y-2.5">
+    <div className="flex flex-col h-full min-h-0 gap-2.5">
       {/* Compact Tab & Print Toolbar (Page Heading Removed) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-1">
         <div className="flex gap-1 overflow-x-auto">
@@ -135,14 +135,14 @@ function ReportsContent() {
 
       {/* TAB 2: OUTSTANDING & OVERDUE WITH STABLE HEADERS */}
       {activeTab === 'outstanding' && (
-        <div className="bg-white rounded-lg border border-slate-200 shadow-2xs overflow-hidden">
+        <div className="bg-white rounded-lg border border-slate-200 shadow-2xs overflow-hidden flex-1 min-h-0 flex flex-col">
           <div className="p-2.5 border-b border-slate-100 flex items-center justify-between">
             <h2 className="text-xs font-bold text-slate-800">
               Installments Due ({outstanding?.count || 0}) &bull; Total: <span className="text-rose-600">{formatCurrency(outstanding?.totalOutstanding || 0)}</span>
             </h2>
           </div>
 
-          <div className="overflow-auto max-h-[calc(100vh-175px)]">
+          <div className="overflow-auto flex-1 min-h-0">
             <table className="w-full text-left border-collapse text-xs">
               <thead className="sticky top-0 z-10 bg-slate-100 shadow-2xs">
                 <tr className="border-b border-slate-200 text-slate-700 font-bold uppercase text-[10px] tracking-wider">
@@ -195,14 +195,14 @@ function ReportsContent() {
 
       {/* TAB 3: COLLECTIONS LOG WITH STABLE HEADERS */}
       {activeTab === 'collections' && (
-        <div className="bg-white rounded-lg border border-slate-200 shadow-2xs overflow-hidden">
+        <div className="bg-white rounded-lg border border-slate-200 shadow-2xs overflow-hidden flex-1 min-h-0 flex flex-col">
           <div className="p-2.5 border-b border-slate-100 flex items-center justify-between">
             <h2 className="text-xs font-bold text-slate-800">
               Collections ({collectionsReport?.count || 0}) &bull; Total: <span className="text-emerald-600">{formatCurrency(collectionsReport?.totalAmount || 0)}</span>
             </h2>
           </div>
 
-          <div className="overflow-auto max-h-[calc(100vh-175px)]">
+          <div className="overflow-auto flex-1 min-h-0">
             <table className="w-full text-left border-collapse text-xs">
               <thead className="sticky top-0 z-10 bg-slate-100 shadow-2xs">
                 <tr className="border-b border-slate-200 text-slate-700 font-bold uppercase text-[10px] tracking-wider">

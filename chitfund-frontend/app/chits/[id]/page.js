@@ -78,6 +78,7 @@ export default function ChitDetailPage() {
         winnerMemberId: auctionWinnerMemberId ? parseInt(auctionWinnerMemberId, 10) : 0,
         winnerName: auctionWinnerName || 'Winner Member',
         bidAmount: bid,
+        discountAmount: bid,
       });
 
       setSelectedScheduleForAuction(null);
@@ -403,7 +404,7 @@ export default function ChitDetailPage() {
 
       {/* AUCTION MODAL (Compact) */}
       {selectedScheduleForAuction && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-2xs flex items-center justify-center p-3">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-2xs flex items-center justify-center p-3 overflow-y-auto">
           <div className="bg-white rounded-xl max-w-sm w-full shadow-xl border border-slate-200 overflow-hidden">
             <div className="px-4 py-2.5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <h3 className="font-bold text-slate-900 text-xs">
@@ -431,14 +432,14 @@ export default function ChitDetailPage() {
                   value={auctionWinnerMemberId}
                   onChange={(e) => {
                     setAuctionWinnerMemberId(e.target.value);
-                    const mem = group.memberships?.find((m) => m.memberId.toString() === e.target.value);
+                    const mem = group.memberships?.find((m) => m.id.toString() === e.target.value);
                     if (mem) setAuctionWinnerName(mem.memberName);
                   }}
                   className="w-full px-2.5 py-1.5 rounded border border-slate-300 text-xs"
                 >
                   <option value="">-- Choose Member --</option>
                   {group.memberships?.map((m) => (
-                    <option key={m.id} value={m.memberId}>
+                    <option key={m.id} value={m.id}>
                       Seat #{m.ticketNumber}: {m.memberName} {m.hasPrized ? '(Already Prized)' : ''}
                     </option>
                   ))}

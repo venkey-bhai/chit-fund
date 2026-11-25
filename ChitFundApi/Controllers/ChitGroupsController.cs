@@ -52,6 +52,7 @@ namespace ChitFundApi.Controllers
                     g.ForemanCommissionPercentage,
                     g.Status,
                     EnrolledCount = g.Members.Count,
+                    TakenTickets = g.Members.Select(m => m.TicketNumber).OrderBy(t => t).ToList(),
                     TotalCollected = _context.Payments
                         .Where(p => p.ChitGroupId == g.Id && p.Status == "Completed")
                         .Sum(p => (decimal?)p.Amount) ?? 0,
@@ -214,12 +215,17 @@ namespace ChitFundApi.Controllers
                 return BadRequest(ApiResponse<string>.Fail($"Group has reached maximum limit of {group.MaxMembers} members."));
             }
 
-            int ticket = req.TicketNumber > 0 ? req.TicketNumber : group.Members.Count + 1;
             var usedTickets = group.Members.Select(m => m.TicketNumber).ToHashSet();
+            if (req.TicketNumber > 0 && usedTickets.Contains(req.TicketNumber))
+                return BadRequest(ApiResponse<string>.Fail($"Token #{req.TicketNumber} is already taken."));
+
+            int ticket = req.TicketNumber > 0 ? req.TicketNumber : 1; // auto: lowest free token
             while (usedTickets.Contains(ticket))
             {
                 ticket++;
             }
+            if (ticket > group.MaxMembers)
+                return BadRequest(ApiResponse<string>.Fail("All seats are filled for this chit."));
 
             var membership = new ChitMember
             {
@@ -270,11 +276,14 @@ namespace ChitFundApi.Controllers
             var group = await _context.ChitGroups
                 .Include(g => g.Auctions)
                     .ThenInclude(a => a.Result)
+                .Include(g => g.Members)
+                    .ThenInclude(m => m.Customer)
                 .FirstOrDefaultAsync(g => g.Id == id);
 
             if (group == null) return NotFound(ApiResponse<string>.Fail("Chit group not found."));
 
             var schedules = GenerateScheduleTable(group);
+            var wonMonths = GetWonMonths(group);
 
             return Ok(new
             {
@@ -299,8 +308,31 @@ namespace ChitFundApi.Controllers
                     monthlyInstallment = group.MonthlySubscription,
                     foremanCommissionPercentage = group.ForemanCommissionPercentage
                 },
+                members = group.Members
+                    .OrderBy(m => m.Id)
+                    .Select(m => new
+                    {
+                        id = m.Id,
+                        name = m.Customer != null ? m.Customer.FullName : $"Member #{m.Id}",
+                        hasPrized = m.HasPrized || wonMonths.ContainsKey(m.Id),
+                        prizedMonthNumber = m.PrizedMonthNumber ?? (wonMonths.TryGetValue(m.Id, out var wm) ? wm : (int?)null)
+                    }),
                 schedules
             });
+        }
+
+        // Member id -> month they won, taken from this group's approved auction results.
+        // Works even when the member's HasPrized flag was never set (older saves).
+        private static Dictionary<int, int> GetWonMonths(ChitGroup group)
+        {
+            var memberIds = group.Members?.Select(m => m.Id).ToHashSet() ?? new HashSet<int>();
+            var won = new Dictionary<int, int>();
+            foreach (var a in group.Auctions ?? new List<Auction>())
+            {
+                if (a.Result != null && a.Result.Status == "Approved" && memberIds.Contains(a.Result.WinnerMemberId))
+                    won[a.Result.WinnerMemberId] = a.AuctionNumber;
+            }
+            return won;
         }
 
         // Helper to generate the exact Chit Schedules Table specified in chitfund.txt:
@@ -308,6 +340,7 @@ namespace ChitFundApi.Controllers
         private List<object> GenerateScheduleTable(ChitGroup group)
         {
             var schedules = new List<object>();
+            var wonMonthsByMember = GetWonMonths(group);
             decimal commissionRate = group.ForemanCommissionPercentage / 100m;
             decimal companyCommission = Math.Round(group.ChitValue * commissionRate, 2);
 
@@ -330,9 +363,10 @@ namespace ChitFundApi.Controllers
                 decimal remainingToCompany = companyCommission;
                 string status = i == 1 ? "Foreman Month" : "Scheduled";
 
-                if (i == 1)
+                bool hasSavedResult = result != null && result.Status == "Approved";
+                if (i == 1 && !hasSavedResult)
                 {
-                    // Month 1: Foreman takes chit or commission
+                    // Month 1 default until a bid discount is entered: Foreman takes chit or commission
                     winnerName = "Company Foreman";
                     bidDiscount = companyCommission;
                     dividendPerMember = 0;
@@ -341,9 +375,15 @@ namespace ChitFundApi.Controllers
                     remainingToCompany = companyCommission;
                     status = "Completed";
                 }
-                else if (result != null && result.Status == "Approved")
+                else if (hasSavedResult)
                 {
-                    winnerName = result.WinnerMember?.Customer?.FullName ?? "Auction Winner";
+                    var winners = group.Members?
+                        .Where(m => m.Customer != null && ((m.HasPrized && m.PrizedMonthNumber == i) || (m.PrizedMonthNumber == null && wonMonthsByMember.TryGetValue(m.Id, out var wmn) && wmn == i)))
+                        .Select(m => m.Customer!.FullName)
+                        .ToList() ?? new List<string>();
+                    winnerName = winners.Count > 0
+                        ? string.Join(", ", winners)
+                        : result.WinnerMember?.Customer?.FullName ?? "Auction Winner";
                     bidDiscount = result.DiscountAmount;
                     decimal totalDiv = result.DistributableDividend;
                     dividendPerMember = group.TotalMembers > 0 ? Math.Round(totalDiv / group.TotalMembers, 2) : 0;
@@ -375,11 +415,52 @@ namespace ChitFundApi.Controllers
                     totalActualCollected = actualCollected,
                     remainingAmountToCompany = remainingToCompany, // "remaining amount to company"
                     status = status,
-                    isAuctionCompleted = result != null || i == 1
+                    isAuctionCompleted = hasSavedResult || i == 1
                 });
             }
 
             return schedules;
+        }
+
+        // PUT: api/v1/chit-groups/{id}
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(int id, [FromBody] ChitGroupUpdateRequest req)
+        {
+            var group = await _context.ChitGroups.Include(g => g.Members).FirstOrDefaultAsync(g => g.Id == id);
+            if (group == null) return NotFound(ApiResponse<string>.Fail("Chit group not found."));
+
+            if (string.IsNullOrWhiteSpace(req.GroupName))
+                return BadRequest(ApiResponse<string>.Fail("Scheme title is required."));
+            if (req.MaxMembers < group.Members.Count)
+                return BadRequest(ApiResponse<string>.Fail($"Maximum members cannot be less than the {group.Members.Count} already enrolled."));
+            if (req.GraceDays < 0)
+                return BadRequest(ApiResponse<string>.Fail("Grace days cannot be negative."));
+
+            var code = req.GroupCode?.Trim().ToUpper();
+            if (!string.IsNullOrEmpty(code) && await _context.ChitGroups.AnyAsync(g => g.Id != id && g.GroupCode == code))
+                return BadRequest(ApiResponse<string>.Fail("Group code is already used by another scheme."));
+
+            group.GroupName = req.GroupName.Trim();
+            if (!string.IsNullOrEmpty(code)) group.GroupCode = code;
+            group.MaxMembers = req.MaxMembers;
+            group.TotalMembers = req.TotalMembers > 0 ? req.TotalMembers : req.MaxMembers;
+            if (!string.IsNullOrWhiteSpace(req.GracePeriod)) group.GracePeriod = req.GracePeriod.Trim();
+            if (req.ForemanCommissionPercentage > 0) group.ForemanCommissionPercentage = req.ForemanCommissionPercentage;
+            if (!string.IsNullOrWhiteSpace(req.Status)) group.Status = req.Status;
+
+            // Keep existing installments' grace end dates in sync with new grace days
+            if (req.GraceDays != group.GraceDays)
+            {
+                group.GraceDays = req.GraceDays;
+                var memberIds = group.Members.Select(m => m.Id).ToList();
+                var installments = await _context.Installments.Where(i => memberIds.Contains(i.ChitMemberId)).ToListAsync();
+                foreach (var inst in installments) inst.GraceEndDate = inst.DueDate.AddDays(req.GraceDays);
+            }
+
+            await _context.SaveChangesAsync();
+            await _auditService.LogAsync(1, "UPDATE_CHIT_GROUP", "ChitGroup", id.ToString(), $"Updated {group.GroupName}");
+
+            return Ok(ApiResponse<string>.Ok("Chit group updated successfully."));
         }
 
         // DELETE: api/v1/chit-groups/{id}
@@ -389,8 +470,25 @@ namespace ChitFundApi.Controllers
             var group = await _context.ChitGroups.FindAsync(id);
             if (group == null) return NotFound(ApiResponse<string>.Fail("Chit group not found."));
 
-            _context.ChitGroups.Remove(group);
-            await _context.SaveChangesAsync();
+            // Financial history must not be wiped silently: block delete if payments/auctions/payouts exist
+            bool hasHistory = await _context.Payments.AnyAsync(p => p.ChitGroupId == id)
+                || await _context.Auctions.AnyAsync(a => a.ChitGroupId == id);
+            if (hasHistory)
+            {
+                return BadRequest(ApiResponse<string>.Fail(
+                    "Cannot delete this chit group: it has payments or auctions recorded. Delete those records first, or mark the group as closed instead."));
+            }
+
+            try
+            {
+                _context.ChitGroups.Remove(group);
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                return BadRequest(ApiResponse<string>.Fail(
+                    "Cannot delete this chit group because other records (members, schedules, payouts, etc.) still depend on it."));
+            }
             await _auditService.LogAsync(1, "DELETE_CHIT_GROUP", "ChitGroup", id.ToString());
 
             return Ok(ApiResponse<string>.Ok("Chit group deleted successfully."));

@@ -46,16 +46,16 @@ function PayoutsContent() {
   }
 
   return (
-    <div className="space-y-2.5">
+    <div className="flex flex-col h-full min-h-0 gap-2.5">
       {/* Table Container with Sticky Headers (Page Heading Removed) */}
-      <div className="bg-white rounded-lg border border-slate-200 shadow-2xs overflow-hidden">
+      <div className="bg-white rounded-lg border border-slate-200 shadow-2xs overflow-hidden flex-1 min-h-0 flex flex-col">
         <div className="p-2.5 border-b border-slate-100 flex items-center justify-between">
           <h2 className="text-xs font-bold text-slate-800">
             Prize Payout Records ({payouts.length})
           </h2>
         </div>
 
-        <div className="overflow-auto max-h-[calc(100vh-140px)]">
+        <div className="overflow-auto flex-1 min-h-0">
           <table className="w-full text-left border-collapse text-xs">
             <thead className="sticky top-0 z-10 bg-slate-100 shadow-2xs">
               <tr className="border-b border-slate-200 text-slate-700 font-bold uppercase text-[10px] tracking-wider">
@@ -145,7 +145,7 @@ function PayoutsContent() {
 
       {/* DISBURSE MODAL (Compact) */}
       {selectedPayout && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-2xs flex items-center justify-center p-3">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-2xs flex items-center justify-center p-3 overflow-y-auto">
           <div className="bg-white rounded-xl max-w-sm w-full shadow-xl border border-slate-200 overflow-hidden">
             <div className="px-4 py-2.5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <h3 className="font-bold text-slate-900 text-xs">Disburse Prize Money</h3>

@@ -18,11 +18,20 @@ builder.Services.AddControllers()
 
 // Configure SQL Server Database Context for ChitProDB
 builder.Services.AddDbContext<ChitFundDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        // Older DB compatibility levels (< 130) lack OPENJSON ... WITH, which EF Core 8 uses for list.Contains()
+        sql => sql.UseCompatibilityLevel(120)));
 
 // Services
 builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
+
+// SMS + WhatsApp notifications (Twilio)
+builder.Services.Configure<TwilioOptions>(builder.Configuration.GetSection("Twilio"));
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<INotificationService, NotificationService>();
+builder.Services.AddHostedService<DueReminderService>();
 
 // JWT authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

@@ -6,7 +6,8 @@ import { useSearchParams } from 'next/navigation';
 import { 
   getChitGroups, 
   createChitGroup, 
-  deleteChitGroup, 
+  updateChitGroup,
+  deleteChitGroup,
   getMembers, 
   enrollMemberInGroup 
 } from '@/lib/api';
@@ -15,7 +16,8 @@ import {
   Coins, 
   PlusCircle, 
   CalendarClock, 
-  Trash2, 
+  Trash2,
+  Pencil,
   UserPlus, 
   X, 
   CheckCircle2, 
@@ -23,6 +25,7 @@ import {
   Calendar,
   AlertCircle
 } from 'lucide-react';
+import DateInput from '@/components/DateInput';
 
 function ChitsContent() {
   const searchParams = useSearchParams();
@@ -33,7 +36,9 @@ function ChitsContent() {
   const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
   const [selectedChitForEnroll, setSelectedChitForEnroll] = useState(null);
   const [enrollMemberId, setEnrollMemberId] = useState('');
-  const [ticketNumber, setTicketNumber] = useState('');
+  const [enrollError, setEnrollError] = useState('');
+  const [editForm, setEditForm] = useState(null);
+  const [editError, setEditError] = useState('');
   const [formError, setFormError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -41,16 +46,16 @@ function ChitsContent() {
   const [formData, setFormData] = useState({
     title: '',
     groupCode: '',
-    totalAmount: 500000,
-    durationYears: 1,
-    numberOfMonths: 12,
-    numberOfMembers: 12,
-    maxMembers: 12,
+    totalAmount: 0,
+    durationYears: 0,
+    numberOfMonths: 0,
+    numberOfMembers: 0,
+    maxMembers: 0,
     startDate: formatDateInput(today),
     endDate: formatDateInput(new Date(today.getFullYear(), today.getMonth() + 11, today.getDate())),
     monthlyStartingDate: 5,
     graceDays: 5,
-    gracePeriod: 'Late fee of ₹50 per day after grace period expiration. Chit auction bidding revoked after 10 days default.',
+    
     foremanCommissionPercentage: 5.0,
   });
 
@@ -77,29 +82,14 @@ function ChitsContent() {
     }
   }
 
-  function handleYearsChange(yearsVal) {
-    const y = parseFloat(yearsVal);
-    const m = Math.round(y * 12);
-
-    let endStr = formData.endDate;
-    if (formData.startDate) {
-      const s = new Date(formData.startDate);
-      s.setMonth(s.getMonth() + m - 1);
-      endStr = formatDateInput(s);
-    }
-
-    setFormData((prev) => ({
-      ...prev,
-      durationYears: y,
-      numberOfMonths: m,
-      numberOfMembers: m,
-      maxMembers: m,
-      endDate: endStr,
-    }));
-  }
-
   function handleMonthsChange(monthsVal) {
-    const m = parseInt(monthsVal, 10) || 1;
+    // Free typing: allow clearing the box; otherwise any whole number of months >= 1
+    if (monthsVal === '') {
+      setFormData((prev) => ({ ...prev, numberOfMonths: 0, durationYears: 0, numberOfMembers: 0, maxMembers: 0 }));
+      return;
+    }
+    const m = parseInt(monthsVal, 10);
+    if (isNaN(m) || m < 1) return;
     const y = +(m / 12).toFixed(2);
 
     let endStr = formData.endDate;
@@ -172,6 +162,45 @@ function ChitsContent() {
     }
   }
 
+  function openEdit(c) {
+    setEditError('');
+    setEditForm({
+      id: c.id,
+      title: c.title || '',
+      groupCode: c.groupCode || '',
+      maxMembers: c.maxMembers,
+      enrolledCount: c.enrolledCount || 0,
+      graceDays: c.graceDays,
+      gracePeriod: c.gracePeriod || '',
+      foremanCommissionPercentage: c.foremanCommissionPercentage,
+      status: c.status || 'Active',
+    });
+  }
+
+  async function handleEditSubmit(e) {
+    e.preventDefault();
+    setEditError('');
+    try {
+      const max = parseInt(editForm.maxMembers, 10);
+      await updateChitGroup(editForm.id, {
+        groupName: editForm.title.trim(),
+        groupCode: editForm.groupCode?.trim() || null,
+        maxMembers: max,
+        totalMembers: max,
+        graceDays: parseInt(editForm.graceDays, 10),
+        gracePeriod: editForm.gracePeriod,
+        foremanCommissionPercentage: Number(editForm.foremanCommissionPercentage),
+        status: editForm.status,
+      });
+      setEditForm(null);
+      setSuccessMessage('Chit Scheme updated successfully!');
+      setTimeout(() => setSuccessMessage(''), 4000);
+      loadData();
+    } catch (err) {
+      setEditError(err.message || 'Error updating Chit Scheme');
+    }
+  }
+
   async function handleDelete(id) {
     if (!confirm('Are you sure you want to delete this Chit Scheme? All schedules and collections will be deleted.')) {
       return;
@@ -186,28 +215,34 @@ function ChitsContent() {
 
   async function handleEnrollSubmit(e) {
     e.preventDefault();
+    setEnrollError('');
     if (!enrollMemberId) {
-      alert('Please select a member');
+      setEnrollError('Please select a member.');
+      return;
+    }
+    const total = selectedChitForEnroll.maxMembers || 0;
+    if ((selectedChitForEnroll.takenTickets || []).length >= total) {
+      setEnrollError(`You cannot add more than ${total} members. All seats are filled.`);
       return;
     }
     try {
+      // ticketNumber 0 = server auto-assigns the next free seat
       await enrollMemberInGroup(selectedChitForEnroll.id, {
-        memberId: parseInt(enrollMemberId, 10),
-        ticketNumber: ticketNumber ? parseInt(ticketNumber, 10) : 0,
+        customerId: parseInt(enrollMemberId, 10),
+        ticketNumber: 0,
       });
       setIsEnrollModalOpen(false);
       setEnrollMemberId('');
-      setTicketNumber('');
       setSuccessMessage('Member enrolled successfully!');
       setTimeout(() => setSuccessMessage(''), 4000);
       loadData();
     } catch (err) {
-      alert(err.message || 'Failed to enroll member');
+      setEnrollError(err.message || 'Failed to enroll member');
     }
   }
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col h-full min-h-0 gap-3">
       {/* Compact Header Bar (Page Heading Removed) */}
       <div className="bg-white rounded-lg border border-slate-200 p-2.5 shadow-2xs flex items-center justify-between">
         <div className="text-xs font-bold text-slate-700">
@@ -243,110 +278,99 @@ function ChitsContent() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {chits.map((c) => (
-            <div
-              key={c.id}
-              className="bg-white rounded-lg border border-slate-200 shadow-2xs hover:shadow-xs transition-shadow p-3.5 space-y-2.5"
-            >
-              {/* Card Header */}
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/60">
-                      {c.groupCode}
-                    </span>
-                    <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      {c.status}
-                    </span>
-                  </div>
-                  <h2 className="text-sm font-bold text-slate-900 mt-0.5">{c.title}</h2>
-                </div>
-                <button
-                  onClick={() => handleDelete(c.id)}
-                  className="text-slate-400 hover:text-rose-600 p-1 rounded hover:bg-rose-50 transition-colors"
-                  title="Delete Chit Scheme"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {/* Financial Highlights (Compact) */}
-              <div className="grid grid-cols-3 gap-2 p-2 bg-slate-50 rounded-md border border-slate-100 text-center text-xs">
-                <div>
-                  <span className="text-[9px] text-slate-500 block uppercase font-medium">Chit Value</span>
-                  <span className="text-xs font-bold text-slate-900">{formatCurrency(c.totalAmount)}</span>
-                </div>
-                <div>
-                  <span className="text-[9px] text-slate-500 block uppercase font-medium">Installment</span>
-                  <span className="text-xs font-bold text-indigo-600">{formatCurrency(c.monthlyInstallment)}</span>
-                </div>
-                <div>
-                  <span className="text-[9px] text-slate-500 block uppercase font-medium">Collected</span>
-                  <span className="text-xs font-bold text-emerald-600">{formatCurrency(c.totalCollected || 0)}</span>
-                </div>
-              </div>
-
-              {/* Detail Specifications (as in chitfund.txt) */}
-              <div className="space-y-1.5 text-xs border-t border-slate-100 pt-2">
-                <div className="grid grid-cols-2 gap-1.5 text-slate-600 text-[11px]">
-                  <div>
-                    <span className="text-slate-400 text-[10px] block">Duration:</span>
-                    <span className="font-semibold text-slate-800">{c.durationYears} Yrs ({c.numberOfMonths} Mos)</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 text-[10px] block">Capacity:</span>
-                    <span className="font-semibold text-slate-800">{c.enrolledCount || c.numberOfMembers} / {c.maxMembers} Max</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 text-[10px] block">Start Date:</span>
-                    <span className="font-medium text-slate-800">{formatDate(c.startDate)}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 text-[10px] block">End Date:</span>
-                    <span className="font-medium text-slate-800">{formatDate(c.endDate)}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 text-[10px] block">Monthly Due:</span>
-                    <span className="font-medium text-slate-800">Every {c.monthlyStartingDate}th</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 text-[10px] block">Grace Days:</span>
-                    <span className="font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded inline-block text-[10px]">
-                      {c.graceDays} Days
-                    </span>
-                  </div>
-                </div>
-
-                <div className="bg-indigo-50/50 p-1.5 rounded border border-indigo-100/50 text-[10px]">
-                  <span className="font-semibold text-indigo-900 block">Policy:</span>
-                  <p className="text-slate-600 truncate">{c.gracePeriod}</p>
-                </div>
-              </div>
-
-              {/* Action Buttons (Reduced Size) */}
-              <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
-                <button
-                  onClick={() => {
-                    setSelectedChitForEnroll(c);
-                    setIsEnrollModalOpen(true);
-                  }}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
-                >
-                  <UserPlus className="w-3 h-3 text-indigo-600" />
-                  <span>Enroll Person</span>
-                </button>
-
-                <Link
-                  href={`/chits/${c.id}`}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-2xs"
-                >
-                  <CalendarClock className="w-3 h-3" />
-                  <span>Schedules Table &rarr;</span>
-                </Link>
-              </div>
-            </div>
-          ))}
+        <div className="bg-white rounded-lg border border-slate-200 shadow-2xs overflow-hidden flex-1 min-h-0 flex flex-col">
+          <div className="overflow-auto flex-1 min-h-0">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead className="bg-slate-100">
+                <tr className="border-b border-slate-200 text-slate-700 font-bold uppercase text-[10px] tracking-wider">
+                  <th className="py-2 px-2.5 whitespace-nowrap">Code</th>
+                  <th className="py-2 px-2.5 whitespace-nowrap">Scheme Title</th>
+                  <th className="py-2 px-2.5 whitespace-nowrap">Chit Value</th>
+                  <th className="py-2 px-2.5 whitespace-nowrap">Installment</th>
+                  <th className="py-2 px-2.5 whitespace-nowrap">Duration</th>
+                  <th className="py-2 px-2.5 whitespace-nowrap">Seats (Filled / Max)</th>
+                  <th className="py-2 px-2.5 whitespace-nowrap">Start Date</th>
+                  <th className="py-2 px-2.5 whitespace-nowrap">End Date</th>
+                  <th className="py-2 px-2.5 whitespace-nowrap">Monthly Due</th>
+                  <th className="py-2 px-2.5 whitespace-nowrap">Grace</th>
+                  <th className="py-2 px-2.5 whitespace-nowrap">Collected</th>
+                  <th className="py-2 px-2.5 whitespace-nowrap">Status</th>
+                  <th className="sticky right-0 z-10 bg-slate-100 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.15)] py-2 px-2.5 text-center whitespace-nowrap">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-700">
+                {chits.map((c) => (
+                  <tr key={c.id} className="group hover:bg-slate-50 transition-colors">
+                    <td className="py-2 px-2.5 whitespace-nowrap">
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/60">
+                        {c.groupCode}
+                      </span>
+                    </td>
+                    <td className="py-2 px-2.5 font-bold text-slate-900 whitespace-nowrap">{c.title}</td>
+                    <td className="py-2 px-2.5 font-bold text-slate-900 whitespace-nowrap">{formatCurrency(c.totalAmount)}</td>
+                    <td className="py-2 px-2.5 font-bold text-indigo-600 whitespace-nowrap">{formatCurrency(c.monthlyInstallment)}</td>
+                    <td className="py-2 px-2.5 whitespace-nowrap">{c.durationYears} Yrs ({c.numberOfMonths} M)</td>
+                    <td className="py-2 px-2.5 font-semibold whitespace-nowrap">
+                      {c.enrolledCount || 0} / {c.maxMembers}
+                      <span className="text-emerald-700 text-[10px] ml-1">
+                        ({Math.max(0, (c.maxMembers || 0) - (c.enrolledCount || 0))} left)
+                      </span>
+                    </td>
+                    <td className="py-2 px-2.5 whitespace-nowrap">{formatDate(c.startDate)}</td>
+                    <td className="py-2 px-2.5 whitespace-nowrap">{formatDate(c.endDate)}</td>
+                    <td className="py-2 px-2.5 whitespace-nowrap">Every {c.monthlyStartingDate}th</td>
+                    <td className="py-2 px-2.5 whitespace-nowrap">
+                      <span className="font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded text-[10px]">
+                        {c.graceDays} Days
+                      </span>
+                    </td>
+                    <td className="py-2 px-2.5 font-bold text-emerald-600 whitespace-nowrap">{formatCurrency(c.totalCollected || 0)}</td>
+                    <td className="py-2 px-2.5">
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        {c.status}
+                      </span>
+                    </td>
+                    <td className="sticky right-0 z-10 bg-white group-hover:bg-slate-50 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.15)] py-2 px-2.5 whitespace-nowrap">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => {
+                            setSelectedChitForEnroll(c);
+                            setEnrollError('');
+                            setIsEnrollModalOpen(true);
+                          }}
+                          className="p-1 rounded text-slate-500 hover:text-indigo-600 hover:bg-indigo-50"
+                          title="Enroll Person"
+                        >
+                          <UserPlus className="w-3.5 h-3.5" />
+                        </button>
+                        {/* <Link
+                          href={`/chits/${c.id}`}
+                          className="p-1 rounded text-slate-500 hover:text-indigo-600 hover:bg-indigo-50"
+                          title="Schedules Table"
+                        >
+                          <CalendarClock className="w-3.5 h-3.5" />
+                        </Link> */}
+                        <button
+                          onClick={() => openEdit(c)}
+                          className="p-1 rounded text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+                          title="Edit Chit Scheme"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(c.id)}
+                          className="p-1 rounded text-slate-500 hover:text-rose-600 hover:bg-rose-50"
+                          title="Delete Chit Scheme"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -385,7 +409,7 @@ function ChitsContent() {
                     className="w-full px-2.5 py-1.5 rounded border border-slate-300 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 font-medium text-xs"
                   />
                 </div>
-                <div>
+                {/* <div>
                   <label className="block font-semibold text-slate-700 mb-0.5">Group Code (Optional)</label>
                   <input
                     type="text"
@@ -394,10 +418,8 @@ function ChitsContent() {
                     onChange={(e) => setFormData({ ...formData, groupCode: e.target.value })}
                     className="w-full px-2.5 py-1.5 rounded border border-slate-300 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 uppercase font-mono text-xs"
                   />
-                </div>
-              </div>
-
-              {/* Total Chit Amount */}
+                </div> */}
+                {/* Total Chit Amount */}
               <div>
                 <label className="block font-semibold text-slate-700 mb-0.5">Total Chit Value (₹) *</label>
                 <input
@@ -410,69 +432,43 @@ function ChitsContent() {
                   className="w-full px-2.5 py-1.5 rounded border border-slate-300 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 font-semibold text-slate-900 text-xs"
                 />
               </div>
+              </div>
+
+              
 
               {/* Duration: Choose how many years of chit & Number of Months */}
               <div className="p-2.5 bg-indigo-50/50 rounded-lg border border-indigo-100 space-y-2">
                 <span className="font-bold text-indigo-950 text-[11px] block">
-                  Duration &amp; Term Configuration (chitfund.txt):
+                  Duration &amp; Term Configuration:
                 </span>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block font-semibold text-slate-700 mb-0.5">
-                      Choose How Many Years of Chit:
-                    </label>
-                    <select
-                      value={formData.durationYears}
-                      onChange={(e) => handleYearsChange(e.target.value)}
-                      className="w-full px-2.5 py-1.5 rounded border border-slate-300 bg-white focus:outline-hidden focus:ring-1 focus:ring-indigo-500 text-xs"
-                    >
-                      <option value="1">1 Year (12 Months)</option>
-                      <option value="1.67">1.67 Years (20 Months)</option>
-                      <option value="2">2 Years (24 Months)</option>
-                      <option value="2.5">2.5 Years (30 Months)</option>
-                      <option value="3">3 Years (36 Months)</option>
-                      <option value="4">4 Years (48 Months)</option>
-                      <option value="5">5 Years (60 Months)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-0.5">
-                      No. of Months:
+                      Choose How Many Months of Chit: *
                     </label>
                     <input
                       type="number"
-                      min="1"
-                      max="120"
                       required
-                      value={formData.numberOfMonths}
+                      min="1"
+                      step="1"
+                      placeholder="e.g. 12"
+                      value={formData.numberOfMonths || ''}
                       onChange={(e) => handleMonthsChange(e.target.value)}
-                      className="w-full px-2.5 py-1.5 rounded border border-slate-300 bg-white focus:outline-hidden focus:ring-1 focus:ring-indigo-500 font-semibold text-xs"
+                      className="w-full px-2.5 py-1.5 rounded border border-slate-300 bg-white focus:outline-hidden focus:ring-1 focus:ring-indigo-500 text-xs"
                     />
                   </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-2 pt-0.5">
                   <div>
-                    <label className="block font-semibold text-slate-700 mb-0.5">No. of Members:</label>
+                    <label className="block font-semibold text-slate-700 mb-0.5">No. of Members: *</label>
                     <input
                       type="number"
                       min="1"
                       required
                       value={formData.numberOfMembers}
-                      onChange={(e) => setFormData({ ...formData, numberOfMembers: e.target.value })}
-                      className="w-full px-2.5 py-1.5 rounded border border-slate-300 bg-white text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-0.5">Maximum Members:</label>
-                    <input
-                      type="number"
-                      min="1"
-                      required
-                      value={formData.maxMembers}
-                      onChange={(e) => setFormData({ ...formData, maxMembers: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, numberOfMembers: e.target.value, maxMembers: e.target.value })
+                      }
                       className="w-full px-2.5 py-1.5 rounded border border-slate-300 bg-white text-xs"
                     />
                   </div>
@@ -483,10 +479,9 @@ function ChitsContent() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-0.5">
-                    Start Date (Day, Month, Year) *
+                    Start Date (dd/mm/yyyy) *
                   </label>
-                  <input
-                    type="date"
+                  <DateInput
                     required
                     value={formData.startDate}
                     onChange={(e) => handleStartDateChange(e.target.value)}
@@ -495,10 +490,9 @@ function ChitsContent() {
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-0.5">
-                    End Date (Day, Month, Year) *
+                    End Date (dd/mm/yyyy) *
                   </label>
-                  <input
-                    type="date"
+                  <DateInput
                     required
                     value={formData.endDate}
                     onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
@@ -510,7 +504,7 @@ function ChitsContent() {
               {/* Monthly Cycle, Grace Days, Grace Period */}
               <div className="p-2.5 bg-amber-50/50 rounded-lg border border-amber-200/60 space-y-2">
                 <span className="font-bold text-amber-950 text-[11px] block">
-                  Cycle &amp; Grace Days (chitfund.txt):
+                  Cycle &amp; Grace Days :
                 </span>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -547,7 +541,7 @@ function ChitsContent() {
                   </div>
                 </div>
 
-                <div>
+                {/* <div>
                   <label className="block font-semibold text-slate-700 mb-0.5">
                     Grace Period Terms &amp; Policy *
                   </label>
@@ -559,7 +553,7 @@ function ChitsContent() {
                     className="w-full px-2.5 py-1.5 rounded border border-slate-300 bg-white text-xs"
                     placeholder="Grace period and late penalty terms..."
                   />
-                </div>
+                </div> */}
               </div>
 
               {/* Commission Percentage */}
@@ -589,7 +583,125 @@ function ChitsContent() {
                   type="submit"
                   className="px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-2xs"
                 >
-                  Create Scheme
+                  Create Chit
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT CHIT SCHEME MODAL */}
+      {editForm && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-2xs flex items-center justify-center p-3 overflow-y-auto">
+          <div className="bg-white rounded-xl max-w-md w-full shadow-xl border border-slate-200 overflow-hidden my-4">
+            <div className="px-4 py-2.5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+              <h3 className="font-bold text-slate-900 text-xs">Edit Chit Scheme &bull; {editForm.groupCode}</h3>
+              <button onClick={() => setEditForm(null)} className="text-slate-400 hover:text-slate-700">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleEditSubmit} className="p-4 space-y-2.5 text-xs">
+              {editError && (
+                <div className="p-2 bg-rose-50 border border-rose-200 text-rose-800 rounded flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                  <span>{editError}</span>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-0.5">Scheme Title *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editForm.title}
+                    onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                    className="w-full px-2.5 py-1.5 rounded border border-slate-300 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-0.5">Group Code</label>
+                  <input
+                    type="text"
+                    value={editForm.groupCode}
+                    onChange={(e) => setEditForm({ ...editForm, groupCode: e.target.value })}
+                    className="w-full px-2.5 py-1.5 rounded border border-slate-300 text-xs uppercase font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-0.5">No. of Members *</label>
+                  <input
+                    type="number"
+                    min={editForm.enrolledCount || 1}
+                    required
+                    value={editForm.maxMembers}
+                    onChange={(e) => setEditForm({ ...editForm, maxMembers: e.target.value })}
+                    className="w-full px-2.5 py-1.5 rounded border border-slate-300 text-xs"
+                  />
+                  <span className="text-[10px] text-slate-400">{editForm.enrolledCount || 0} already enrolled</span>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-0.5">Grace Days *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="30"
+                    required
+                    value={editForm.graceDays}
+                    onChange={(e) => setEditForm({ ...editForm, graceDays: e.target.value })}
+                    className="w-full px-2.5 py-1.5 rounded border border-slate-300 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-0.5">Foreman Commission (%)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="10"
+                    step="0.1"
+                    value={editForm.foremanCommissionPercentage}
+                    onChange={(e) => setEditForm({ ...editForm, foremanCommissionPercentage: e.target.value })}
+                    className="w-full px-2.5 py-1.5 rounded border border-slate-300 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-0.5">Status</label>
+                  <select
+                    value={editForm.status}
+                    onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                    className="w-full px-2.5 py-1.5 rounded border border-slate-300 text-xs bg-white"
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Closed">Closed</option>
+                    <option value="Inactive">Inactive</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-0.5">Grace Period Terms &amp; Policy</label>
+                <textarea
+                  rows="2"
+                  value={editForm.gracePeriod}
+                  onChange={(e) => setEditForm({ ...editForm, gracePeriod: e.target.value })}
+                  className="w-full px-2.5 py-1.5 rounded border border-slate-300 text-xs"
+                />
+              </div>
+              <p className="text-[10px] text-slate-400">
+                Chit value, duration and dates can&apos;t be edited because installments are already generated from them.
+              </p>
+              <div className="pt-2 border-t border-slate-200 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditForm(null)}
+                  className="px-3 py-1.5 rounded text-slate-600 hover:bg-slate-100 text-xs font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold"
+                >
+                  Save Changes
                 </button>
               </div>
             </form>
@@ -599,7 +711,7 @@ function ChitsContent() {
 
       {/* ENROLL MEMBER MODAL (Compact) */}
       {isEnrollModalOpen && selectedChitForEnroll && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-2xs flex items-center justify-center p-3">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-2xs flex items-center justify-center p-3 overflow-y-auto">
           <div className="bg-white rounded-xl max-w-sm w-full shadow-xl border border-slate-200 overflow-hidden">
             <div className="px-4 py-2.5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <h3 className="font-bold text-slate-900 text-xs">Enroll Chit Person</h3>
@@ -634,20 +746,33 @@ function ChitsContent() {
                 </select>
               </div>
 
-              <div>
-                <label className="block font-semibold text-slate-700 mb-0.5">
-                  Seat Number (1 to {selectedChitForEnroll.maxMembers})
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max={selectedChitForEnroll.maxMembers}
-                  placeholder="Auto-assign next seat"
-                  value={ticketNumber}
-                  onChange={(e) => setTicketNumber(e.target.value)}
-                  className="w-full px-2.5 py-1.5 rounded border border-slate-300 text-xs"
-                />
-              </div>
+              {(() => {
+                const total = selectedChitForEnroll.maxMembers || 0;
+                const taken = selectedChitForEnroll.takenTickets || [];
+                const remaining = Math.max(0, total - taken.length);
+                return (
+                  <div className="grid grid-cols-3 gap-1.5 text-center">
+                    <div className="p-1.5 rounded border border-slate-200 bg-slate-50">
+                      <div className="text-[10px] text-slate-500 font-semibold uppercase">Total Seats</div>
+                      <div className="text-sm font-bold text-slate-900">{total}</div>
+                    </div>
+                    <div className="p-1.5 rounded border border-indigo-200 bg-indigo-50">
+                      <div className="text-[10px] text-indigo-600 font-semibold uppercase">Filled</div>
+                      <div className="text-sm font-bold text-indigo-700">{taken.length}</div>
+                    </div>
+                    <div className={`p-1.5 rounded border ${remaining === 0 ? 'border-rose-200 bg-rose-50' : 'border-emerald-200 bg-emerald-50'}`}>
+                      <div className={`text-[10px] font-semibold uppercase ${remaining === 0 ? 'text-rose-600' : 'text-emerald-600'}`}>Remaining</div>
+                      <div className={`text-sm font-bold ${remaining === 0 ? 'text-rose-700' : 'text-emerald-700'}`}>{remaining}</div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {enrollError && (
+                <div className="p-2 bg-rose-50 border border-rose-200 text-rose-800 rounded text-xs font-medium">
+                  {enrollError}
+                </div>
+              )}
 
               <div className="pt-2 border-t border-slate-200 flex justify-end gap-1.5">
                 <button
@@ -659,7 +784,7 @@ function ChitsContent() {
                 </button>
                 <button
                   type="submit"
-                  className="px-3 py-1 rounded bg-indigo-600 text-white font-semibold text-xs hover:bg-indigo-700"
+                  className="px-3 py-1 rounded bg-indigo-600 text-white font-semibold text-xs hover:bg-indigo-700 disabled:opacity-50"
                 >
                   Confirm Enrollment
                 </button>

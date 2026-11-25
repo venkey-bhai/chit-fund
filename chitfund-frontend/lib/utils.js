@@ -13,11 +13,18 @@ export function formatDate(dateString) {
   if (!dateString) return 'N/A';
   const d = new Date(dateString);
   if (isNaN(d.getTime())) return dateString;
-  return d.toLocaleDateString('en-IN', {
+  return d.toLocaleDateString('en-GB', {
     day: '2-digit',
-    month: 'short',
+    month: '2-digit',
     year: 'numeric',
   });
+}
+
+export function formatDateTime(dateString) {
+  if (!dateString) return 'N/A';
+  const d = new Date(dateString);
+  if (isNaN(d.getTime())) return dateString;
+  return `${formatDate(d)} ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
 }
 
 export function formatDateInput(dateString) {
